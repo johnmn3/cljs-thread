@@ -1,0 +1,22 @@
+;; shadow-cljs configuration
+{:nrepl
+ {:port 8777}
+
+ :dev-http
+ {8280 "resources/public"}
+
+ :deps {:aliases [:cljs]}
+
+ :builds
+ {:client
+  {:target     :browser
+   :output-dir "resources/public/js"
+   :modules
+   {:shared {:entries []}
+    :screen
+    {:init-fn in-mesh.shadow.screen/-main
+     :depends-on #{:shared}}
+    :root
+    {:init-fn in-mesh.shadow.root/-main
+     :depends-on #{:shared}
+     :web-worker true}}}}}
