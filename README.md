@@ -100,7 +100,7 @@ More docs will be forthcoming, but there's a bit of a runthrough in the `/figwhe
   :end)
 ```
 
-`in.mesh` is derived from [`tau.alpha`](https://github.com/johnmn3/tau.alpha) which I released about four years ago. That project evolved towards working with SharedArrayBuffers (SABs).
+`in.mesh` is derived from [`tau.alpha`](https://github.com/johnmn3/tau.alpha) which I released about four years ago. That project evolved towards working with SharedArrayBuffers (SABs). A slightly update version of `tau.alpha` is available here: https://gitlab.com/johnmn3/tau and you can see a demo of the benefits of SABs here: https://simultaneous.netlify.app/
 
 This project extracts out the non-SAB parts of `tau.alpha`. When you spawn a node in `in.mesh`, it automatically creates connections to all other nodes, creating a fully connected mesh.
 
