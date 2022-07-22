@@ -5,25 +5,25 @@
    [reagent.core :as r]
    [inmesh.core :as mesh :refer [in]]))
 
-(def reg-sub
+(def ^:export reg-sub
   (if-not (mesh/in-core?)
     identity
     (fn [& args]
       (apply re-frame/reg-sub args))))
 
-(defonce subscriptions
+(defonce ^:export subscriptions
   (r/atom {}))
 
-(defn dispatch
+(defn ^:export dispatch
   [event]
   (if (mesh/in-core?)
     (re-frame/dispatch event)
     (in :core {:no-res? true} (re-frame.core/dispatch event))))
 
-(defonce trackers
+(defonce ^:export trackers
   (atom {}))
 
-(defn- reg-tracker
+(defn- ^:export reg-tracker
   [ts id sub-v]
   (if ts
     (update ts :subscribers conj id)
@@ -34,11 +34,11 @@
                  [])
        :subscribers #{id}})))
 
-(defn add-sub
+(defn ^:export add-sub
   [[id sub-v]]
   (swap! trackers update sub-v reg-tracker id sub-v))
 
-(defn- unreg-tracker
+(defn- ^:export unreg-tracker
   [ts id sub-v]
   (if-let [t (get ts sub-v)]
     (let [{:keys [tracker subscribers]} t
@@ -51,11 +51,11 @@
           (dissoc ts sub-v))))
     ts))
 
-(defn dispose-sub
+(defn ^:export dispose-sub
   [[id sub-v]]
   (swap! trackers unreg-tracker id sub-v))
 
-(defn subscribe
+(defn ^:export subscribe
   [sub-v & [alt]]
   (if (mesh/in-core?)
     (re-frame/subscribe sub-v)

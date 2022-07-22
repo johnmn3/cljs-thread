@@ -81,11 +81,11 @@
 (defn in-branch? []
   (and (not (in-screen?)) (not (in-root?))))
 
-(defn in-shadow? []
-  (exists? js/self.shadow.cljs))
+;; (defn in-shadow? []
+;;   (exists? js/self.shadow.cljs))
 
-(defn in-figwheel? []
-  (exists? js/self.figwheel.core))
+;; (defn in-figwheel? []
+;;   (exists? js/self.figwheel.core))
 
 #_(println :in (cond (in-shadow?) :shadow
                      (in-figwheel?) :figwheel))
@@ -344,7 +344,7 @@
     (cond simple-override simple-override
           ;; (-> data :id (= :sw)) (or sw-override "/sw-main.js")
           true #_(in-shadow?) (shadow-connection-strings data)
-          (in-figwheel?) (figwheel-connection-strings data)
+          true #_(in-figwheel?) (figwheel-connection-strings data)
           ;; (= :root id) (or root-override (scripts-src "/js/screen.js") default-cljs)
           ;; (= :future id) (or future-override (scripts-src "/js/future.js") default-cljs)
           ;; (= :core id) (or core-override (scripts-src "/js/core.js") default-cljs)
@@ -565,6 +565,7 @@
                                              %)))
                          (js/eval (str "(" sargs ")();")))))
               (catch :default e
+                (println :error-in (:id init-data))
                 (println :error-in-do-call e)
                 (println :error (.-error e))
                 (println :data data)
@@ -687,7 +688,7 @@
   ;; (def last-injest-worker (last injest-workers))
   (spawn {:id :future})
   (spawn {:id :core})
-  (when (in-shadow?)
+  (when false ;true ;(in-shadow?)
     (spawn {:id :repl}))
 
   ;(on-when (contains? @peers :sw) {:duration 100})
@@ -1098,8 +1099,3 @@
   (time (println (apply + (take 1000 (fan     #(map (flip 10000)) (range) :chunk 32)))))
   (time (println (apply + (take 1000 (sequence  (map (flip 10000)) (range))))))
   :end)
-
-
-
-
-

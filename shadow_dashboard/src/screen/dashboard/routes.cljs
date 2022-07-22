@@ -1,7 +1,6 @@
 (ns dashboard.routes
   (:require
    [re-frame.core :as rf]
-   [reitit.coercion.spec]
    [reitit.frontend]
    [reitit.frontend.easy :as rfe]
    [reitit.frontend.controllers :as rfc]
@@ -10,7 +9,7 @@
 
 
 (defn log-fn [& args]
-  (fn [& _] 
+  (fn [& _]
     #_(apply js/console.log args)))
 
 
@@ -65,14 +64,13 @@
 (def router
   (reitit.frontend/router
    routes
-   {:data {:coercion reitit.coercion.spec/coercion}}))
+   {}))
 
 (defn on-navigate [new-match]
   (when new-match
     (rf/dispatch [:navigated new-match])))
 
 (defn init-routes! []
-  (js/console.log "initializing routes")
   (rfe/start!
    router
    on-navigate

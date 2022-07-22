@@ -37,8 +37,7 @@
         create-transitions (fn [& args]
                              (apply (-> theme :transitions :create)
                                     (apply clj->js args)))]
-    {
-     (str "&." (:root classes))          {:display "flex"}
+    {(str "&." (:root classes))          {:display "flex"}
      (str "&." (:toolbar classes))       {:padding-right 24}
      (str "&." (:toolbar-icon classes))  {:display        "flex"
                                           :align-items     "center"
