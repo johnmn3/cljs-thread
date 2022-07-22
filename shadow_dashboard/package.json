@@ -1,0 +1,31 @@
+{
+  "name": "dashboard-inmesh-re-frame-comp.el",
+  "scripts": {
+    "watch": "npx shadow-cljs watch client",
+    "release": "npx shadow-cljs release client",
+    "build-report": "npx shadow-cljs run shadow.cljs.build-report client target/build-report.html"
+  },
+  "devDependencies": {
+    "karma": "6.3.7",
+    "karma-chrome-launcher": "3.1.0",
+    "karma-cljs-test": "0.1.0",
+    "karma-junit-reporter": "2.0.1",
+    "karma-phantomjs-launcher": "1.0.4",
+    "shadow-cljs": "2.19.5"
+  },
+  "dependencies": {
+    "@emotion/react": "11.9.0",
+    "@emotion/styled": "11.8.1",
+    "@mui/material": "5.6.2",
+    "core-js": "^3.6.5",
+    "create-react-class": "^15.6.3",
+    "events": "^3.2.0",
+    "highlight.js": "11.1.0",
+    "process": "^0.11.10",
+    "react": "17.0.2",
+    "react-chartjs-2": "^4.3.1",
+    "react-dom": "17.0.2",
+    "react-transition-group": "^4.4.2",
+    "recharts": "^2.1.12"
+  }
+}

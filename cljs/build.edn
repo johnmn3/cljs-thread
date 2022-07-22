@@ -1,4 +1,0 @@
-{:target :webworker
- :main in-mesh.core
-;;  :asset-path "../"
- :output-to "out/main.js"}

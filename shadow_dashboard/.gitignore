@@ -1,0 +1,9 @@
+.calva
+.clj-kondo
+.cpcache
+/out
+.nrep-port
+node_modules/*
+.shadow-cljs
+resources/public/*
+!resources/public/index.html
