@@ -1,6 +1,0 @@
-{:deps {org.clojure/clojurescript {:mvn/version "1.10.758"}
-        in-mesh/in-mesh {:local/root "../"}}
-        ;; nrepl/nrepl {:mvn/version "0.9.0"}
-        ;; cider/cider-nrepl {:mvn/version "0.27.4"}}
- :aliases {:dev
-           {:main-opts ["-m" "cljs.main" "-v" "-co" "build.edn" "-c" "-s"]}}}

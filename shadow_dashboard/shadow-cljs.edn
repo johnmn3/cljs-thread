@@ -1,0 +1,37 @@
+;; shadow-cljs configuration
+{:nrepl
+ {:port 8777}
+
+ :dev-http
+ {8280 "resources/public"}
+
+ :deps {:aliases [:cljs]}
+
+
+ :builds
+ {:repl ; <- just for getting a stable connection for repling, optional
+  {:target :browser
+   :output-dir "resources/public"
+   :modules {:repl {:entries [dashboard.core]
+                    :web-worker true}}}
+  :sw
+  {:target :browser
+   :output-dir "resources/public"
+   :modules {:sw {;:entries [dashboard.core]
+                  :init-fn inmesh.sw/init!
+                  :web-worker true}}}
+  :core
+  {:target     :browser
+   :compiler-options {:output-wrapper false}
+   :output-dir "resources/public" ; <- necessary because sw.js must be in root, but output-dir doesn't work per module
+   :js-options {:resolve {"highlight.js" {:target :npm :require "highlight.js/lib/core"}
+                          "lowlight" {:target :npm :require "lowlight/lib/core"}}}
+   :modules
+   {:shared {:entries []}
+    :screen
+    {:init-fn dashboard.screen/init!
+     :depends-on #{:shared}}
+    :core
+    {:init-fn dashboard.core/init!
+     :depends-on #{:shared}
+     :web-worker true}}}}}

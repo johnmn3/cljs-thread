@@ -1,5 +1,7 @@
 .calva
-.clj-kondo
+.clj-kondo/*
+!.clj-kondo/config.edn
+!.clj-kondo/net.clojars.john
 .cpcache
 /out
 .nrep-port

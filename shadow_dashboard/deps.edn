@@ -1,0 +1,23 @@
+{:paths ["src/lib"
+         "src/main"
+         "src/screen"]
+ :deps {reagent/reagent             {:mvn/version "1.1.0"}
+        re-frame/re-frame           {:mvn/version "1.3.0-rc3"}
+        arttuka/reagent-material-ui {:mvn/version "5.6.2-1"}
+        net.cgrand/macrovich        {:mvn/version "0.2.1"}
+        org.clojure/tools.logging   {:mvn/version "1.1.0"}
+        binaryage/devtools          {:mvn/version "1.0.4"}
+       ;;  clj-commons/secretary       {:mvn/version "1.2.4"}
+        metosin/reitit              {:mvn/version "0.5.5"}
+       ;;  day8.re-frame/tracing       {:mvn/version "0.6.2"}
+       ;;  day8.re-frame/re-frame-10x  {:mvn/version "1.2.0"}
+        day8/shadow-git-inject      {:mvn/version "0.0.5"}
+        johnmn3/comp.el             {:git/url "https://github.com/johnmn3/comp.el.git"
+                                     :sha     "8dc9f904d2328cbe62230044d299f71734df0168"}
+        BrianChevalier/radiant      {:git/url "https://github.com/johnmn3/radiant.git"
+                                     :sha     "20e5dedd09275f27b2146a629a0b92078963db7b"}
+        inmesh/inmesh {:local/root "../"}}
+ :aliases
+ {:cljs
+  {:extra-deps {thheller/shadow-cljs {:mvn/version "2.19.5"}
+                binaryage/devtools {:mvn/version "1.0.4"}}}}}
