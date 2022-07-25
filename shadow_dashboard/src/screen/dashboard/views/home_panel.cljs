@@ -58,7 +58,6 @@
       :pointHitRadius 10
       :data [124, 144, 133, 277, 156, 188, 140]}]}))
 
-
 (defn chart [{:keys [^js classes]}]
   (let [chart-data (rf/subscribe [:home-panel/chart-data])]
     [:<>

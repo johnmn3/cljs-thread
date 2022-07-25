@@ -1,13 +1,23 @@
 (ns dashboard.screen
   (:require
    [reagent.dom :as rdom]
-   [comp.el :as comp]
+   [comp.el :as c]
+   [inmesh.core :as mesh]
+   [inmesh.state :as state]
    [inmesh.re-frame :as rf :refer [dispatch subscribe]]
-   [day8.re-frame.tracing :refer-macros [fn-traced]]
    [dashboard.routes :as routes]
    [dashboard.shell :as shell]))
 
 ;;; Config
+(enable-console-print!)
+
+
+(mesh/init!
+ {:sw-connect-string "/sw.js"
+  :repl-connect-string "/repl.js"
+  :core-connect-string "/core.js"
+  :future true
+  :injest true})
 
 (def debug?
   ^boolean goog.DEBUG)
@@ -28,8 +38,8 @@
 (defn main-shell [{:keys [router]}]
   (let [dark-theme? @(rf/subscribe [:dark-theme?])]
     [:<>
-     [comp/css-baseline]
-     [comp/theme-provider (comp/create-theme (custom-theme dark-theme?))
+     [c/css-baseline]
+     [c/theme-provider (c/create-theme (custom-theme dark-theme?))
       [shell/styled-dashboard]]]))
 
 ;;; Setup on screen

@@ -1,9 +1,32 @@
 (ns dashboard.regs.db
   (:require
-   [day8.re-frame.tracing :refer-macros [fn-traced]]
-   [re-frame.core :as rf :refer [subscribe]]
-   [inmesh.core :as mesh :refer [in]]
-   [inmesh.re-frame :refer [reg-sub dispatch]]))
+   [clojure.edn :as edn]
+   [re-frame.core :as rf :refer [subscribe reg-cofx inject-cofx]]
+   [inmesh.core :as mesh :refer [in wait spawn]]
+   [inmesh.env :refer [in-core?]]
+   [inmesh.state :as s]
+   [inmesh.re-frame :refer [reg-sub dispatch]]
+   [inmesh.db :refer [db-get db-set!]]))
+ 
+(def ls-key "local-store")
+
+(defn app-state->local-store
+  "Puts app-state into local forage"
+  [app-state]
+  (db-set! ls-key app-state))
+
+(def ->local-store (rf/after app-state->local-store))
+
+(def app-state-interceptors
+  [->local-store
+   rf/trim-v])
+
+(when (in-core?)
+  (rf/reg-cofx
+   :local-store
+   (fn [cofx second-param]
+     (let [local-store (or (db-get ls-key) {})]
+       (assoc cofx :app-state local-store)))))
 
 (def default-db
   {:dark-theme? false
@@ -83,7 +106,6 @@
                      {:title "Legal"
                       :description ["Privacy policy" "Terms of use"]}]})
 
-
 ;; subs
 
 (rf/reg-sub
@@ -103,12 +125,14 @@
 
 ;;; events
 
-(rf/reg-event-db
+(rf/reg-event-fx
  :initialize-db
- (fn-traced [_ _]
-   default-db))
+ [(rf/inject-cofx :local-store)]
+ (fn [{:as cofx :keys [db app-state]} second-param]
+   {:db (merge default-db app-state)}))
 
 (rf/reg-event-db
  :toggle-dark-theme
- (fn-traced [db _]
-   (update db :dark-theme? not)))
+ app-state-interceptors
+ (fn [app-state [stuff s2]]
+   (update app-state :dark-theme? not)))

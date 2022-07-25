@@ -1,6 +1,5 @@
 (ns dashboard.regs.home-panel
   (:require
-   [day8.re-frame.tracing :refer-macros [fn-traced]]
    [re-frame.core :as rf :refer [subscribe]]
    [inmesh.core :as mesh :refer [in]]
    [inmesh.re-frame :refer [reg-sub dispatch]]))

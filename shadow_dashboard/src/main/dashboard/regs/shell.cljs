@@ -1,6 +1,6 @@
 (ns dashboard.regs.shell
   (:require
-   [day8.re-frame.tracing :refer-macros [fn-traced]]
+   [dashboard.regs.db :as db]
    [re-frame.core :as rf :refer [subscribe]]
    [inmesh.core :as mesh :refer [in]]
    [inmesh.re-frame :refer [reg-sub dispatch]]))
@@ -20,11 +20,13 @@
 
 (rf/reg-event-db
  :drawer/open
+ db/app-state-interceptors
  (fn [db _]
    (assoc db :drawer/open? true)))
 
 (rf/reg-event-db
  :drawer/close
+ db/app-state-interceptors
  (fn [db _]
    (assoc db :drawer/open? false)))
 

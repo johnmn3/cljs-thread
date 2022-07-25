@@ -9,7 +9,7 @@
 
 
 (defn log-fn [& args]
-  (fn [& _]
+  (fn [& _] 
     #_(apply js/console.log args)))
 
 

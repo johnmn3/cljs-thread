@@ -1,6 +1,5 @@
 (ns dashboard.shell
   (:require
-   [clojure.pprint :as pp]
    [reagent.core :as reagent]
    [comp.el :as c]
    [re-frame.core]
@@ -58,7 +57,6 @@
      (str "& ." (:title classes)) {:flexGrow 1}
      (str "& ." (:drawer-paper classes)) {:position   "relative"
                                           :white-space "nowrap"
-                                          ;; :left 20
                                           :top (-> theme :mixins :toolbar :min-height (+ 8))
                                           :width drawer-width
                                           :transition (let [create (-> theme :transitions :create)]
@@ -70,7 +68,7 @@
                                                                                (create "width"
                                                                                        #js {:easing   (-> theme :transitions :easing :sharp)
                                                                                             :duration (-> theme :transitions :duration :entering-screen)}))
-                                                :width                       (spacing 4)
+                                                :width                       0 #_(spacing 0)
                                                 ((-> theme :breakpoints :up) "sm") {:width (spacing 6)}}
      (str "& ." (:app-bar-spacer classes)) (-> theme :mixins :toolbar)
      (str "& ." (:content classes)) {:flexGrow 1
@@ -121,60 +119,59 @@
              [c/exit-to-app {:fontSize "small"}]]
             "Logout"]]]))))
 
-(defn dashboard [{:as stuff :keys [class-name]}]
-    (let [open? @(rf/subscribe [:drawer/open?])
-          dark-theme? @(rf/subscribe [:dark-theme?])
-          router routes/router
-          current-route @(re-frame.core/subscribe [:current-route])]
-      [c/box {:class [class-name (:root classes)]}
-       [c/app-bar {:position "absolute"
-                   :class [(:app-bar classes)]}
-        [c/toolbar {:class (:toolbar classes)}
-         [c/icon-button {:edge "start"
-                         :color "inherit"
-                         :aria-label "open drawer"
-                         :on-click #(if open?
-                                      (rf/dispatch [:drawer/close])
-                                      (rf/dispatch [:drawer/open]))
-                         :class [(:menu-button classes)]}
-          [c/menu-icon]]
-         [c/text {:component "h1"
-                  :variant "h6"
-                  :color "inherit"
-                  :no-wrap true
-                  :class (:title classes)}
-          "Acme Analytics"]
-         [c/icon-button {:color "inherit"}
-          [c/badge {:badgeContent 4 :color "secondary"}]
-          [c/notifications]]
-         [account-menu {}]]]
+(defn dashboard [{:keys [class-name]}]
+  (let [open? @(rf/subscribe [:drawer/open?])
+        dark-theme? @(rf/subscribe [:dark-theme?])
+        router routes/router
+        current-route @(re-frame.core/subscribe [:current-route])]
+    [c/box {:class [class-name (:root classes)]}
+     [c/app-bar {:position "absolute"
+                 :class [(:app-bar classes)]}
+      [c/toolbar {:class (:toolbar classes)}
+       [c/icon-button {:edge "start"
+                       :color "inherit"
+                       :aria-label "open drawer"
+                       :on-click #(if open?
+                                    (rf/dispatch [:drawer/close])
+                                    (rf/dispatch [:drawer/open]))
+                       :class [(:menu-button classes)]}
+        [c/menu-icon]]
+       [c/text {:component "h1"
+                :variant "h6"
+                :color "inherit"
+                :no-wrap true
+                :class (:title classes)}
+        "Acme Analytics"]
+       [c/icon-button {:color "inherit"}
+        [c/badge {:badgeContent 4 :color "secondary"}]
+        [c/notifications]]
+       [account-menu {}]]]
 
-       [c/drawer {:variant "permanent"
-                  :classes {:paper (str (:drawer-paper classes) " "
-                                        (if open? "" (:drawer-paper-close classes)))}
-                  :open open?}
-        [:div {:class (:toolbar-icon classes)}]
-        [c/divider]
-        [c/list-items
-         (for [route-name (reitit/route-names router)
-               :let [route (reitit/match-by-name router route-name)
-                     text (-> route :data :link-text)
-                     icon (-> route :data :icon)
-                     selected? (= route-name (-> current-route :data :name))]]
-           ^{:key route-name} [list-item {:text text
-                                          :icon icon
-                                          :route-name route-name
-                                          :selected selected?}])]
-        [c/divider]
-        [c/list-items
-         [c/list-item {:button true
-                       :style {:left 5 :top 10}
-                       :on-click #(rf/dispatch [:toggle-dark-theme])}
-          [c/list-item-icon [c/switch {:size "small" :checked (or dark-theme? false)}]]
-          [c/list-item-text {:primary "Toggle Theme"}]]]]
-       [:main {:class (:content classes)}
-        [:div {:class (:app-bar-spacer classes)}]
-        (when current-route
-          [(-> current-route :data :view) {:classes classes}])]]))
+     [c/drawer {:variant "permanent"
+                :classes {:paper (str (:drawer-paper classes) " "
+                                      (if open? "" (:drawer-paper-close classes)))}
+                :open open?}
+      [c/divider]
+      [c/list-items
+       (for [route-name (reitit/route-names router)
+             :let [route (reitit/match-by-name router route-name)
+                   text (-> route :data :link-text)
+                   icon (-> route :data :icon)
+                   selected? (= route-name (-> current-route :data :name))]]
+         ^{:key route-name} [list-item {:text text
+                                        :icon icon
+                                        :route-name route-name
+                                        :selected selected?}])]
+      [c/divider]
+      [c/list-items
+       [c/list-item {:button true
+                     :style {:left 5 :top 10}
+                     :on-click #(rf/dispatch [:toggle-dark-theme])}
+        [c/list-item-icon [c/switch {:size "small" :checked (or dark-theme? false)}]]
+        [c/list-item-text {:primary "Toggle Theme"}]]]]
+     [:main {:class (:content classes)}
+      [:div {:class (:app-bar-spacer classes)}]
+      (when current-route
+        [(-> current-route :data :view) {:classes classes}])]]))
 
 (def styled-dashboard (c/styled dashboard custom-styles))

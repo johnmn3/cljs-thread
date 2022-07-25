@@ -3,7 +3,6 @@
    [reagent.core :as reagent]
    [comp.el :as c]
    [inmesh.re-frame :refer [dispatch subscribe]]
-   [day8.re-frame.tracing :refer-macros [fn-traced]]
    [dashboard.footer :refer [copyright]]))
 
 ;;; Styles

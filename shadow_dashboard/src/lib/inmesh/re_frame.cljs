@@ -3,10 +3,11 @@
    [reagent.ratom :as ra]
    [re-frame.core :as re-frame]
    [reagent.core :as r]
-   [inmesh.core :as mesh :refer [in]]))
+   [inmesh.core :as mesh :refer [in]]
+   [inmesh.env :as env]))
 
 (def ^:export reg-sub
-  (if-not (mesh/in-core?)
+  (if-not (env/in-core?)
     identity
     (fn [& args]
       (apply re-frame/reg-sub args))))
@@ -16,7 +17,7 @@
 
 (defn ^:export dispatch
   [event]
-  (if (mesh/in-core?)
+  (if (env/in-core?)
     (re-frame/dispatch event)
     (in :core {:no-res? true} (re-frame.core/dispatch event))))
 
@@ -57,7 +58,7 @@
 
 (defn ^:export subscribe
   [sub-v & [alt]]
-  (if (mesh/in-core?)
+  (if (env/in-core?)
     (re-frame/subscribe sub-v)
     (let [id (str (random-uuid))]
       (in :core {:no-res? true} (add-sub [id sub-v]))
