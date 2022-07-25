@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-importScripts("shared.js");
-(function(){
-'use strict';
-=======
 var shadow$provide = {};
 importScripts();
 (function(){
@@ -381,5 +376,4 @@ e)}):null});fa("inmesh.sw.respond",function(a,b){return Jd.F($i,sc,a,b)});functi
 function hj(a){var b=new URL(a.request.url),c=Si(b.search),d=yd(c),e=G.h(d,uh),f=G.h(d,Wg);return a.respondWith(Wi(function(){return Jc(E($i),e)},function(){var h=G.h(E($i),e);Jd.j($i,uc,e);return fj(h)}).then(function(h){return Promise.resolve(h)}).catch(function(h){Nf(W([gh,h]));Nf(W([uh,e]));Nf(W([Wg,f]));Nf(W([Mg,h.stack]));Nf(W([hh,Mf(W([a]))]));Nf(W([Eg,Mf(W([b]))]));Nf(W([Ig,Mf(W([c]))]));return Promise.resolve(Vf(new v(null,1,[gh,h],null)))}))}
 function ij(a){a.request.clone().text().then(function(b){b=Ri(b);var c=yd(b);b=G.h(c,uh);c=G.h(c,ih);return Jd.F($i,sc,b,c)});return a.respondWith(Promise.resolve(fj("done")))}function jj(a){var b=(new URL(a.request.url)).pathname;Q.h(b,"/intercept/sleep/t.js")?(b=new URL(a.request.url),b=Mf(W([Ri(ud(C,Vb(C.g(b.search))))])),a=a.respondWith(ej(b).then(gj))):a=Q.h(b,"/intercept/request/key.js")?hj(a):Q.h(b,"/intercept/response/key.js")?ij(a):null;return a}
 Q.h(kh.g(Ti),ch)&&(self.addEventListener("install",function(){return self.skipWaiting()}),self.addEventListener("activate",function(){return self.clients.claim()}),self.addEventListener("fetch",jj));
->>>>>>> 5b4f22c (add docs example)
 }).call(this);
