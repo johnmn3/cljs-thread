@@ -15,7 +15,7 @@ Place the following in the `:deps` map of your `deps.edn` file:
 ```
 ...
 johnmn3/inmesh {:git/url "https://github.com/johnmn3/inmesh.git"
-                :sha     "8dc9f904d2328cbe62230044d299f71734df0168"}
+                :sha     "e21bfe4b08d5a3185674a2557741b41f939bf4c6"}
 ...
 ```
 ### Build Tools
