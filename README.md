@@ -73,6 +73,13 @@ Eventually, once all the different build tools have robust configurations, I wou
 ```
 `:sw-connect-string` defines where your service worker artifact is found, relative to the base directory of your server. Same goes for `:repl-connect-string` and `:core-connect-string`. You can also provide a `:root-connect-string`, `:future-connect-string` and `:injest-connect-string` - if you don't, they will default to your `:core-connect-string`.
 
+## Demo
+https://johnmn3.github.io/inmesh/
+
+The `shadow-dashboard` example project contains a standard dashboard demo built on re-frame/mui-v5/comp.el/sync-IndexedDB, with application logic (reg-subs & reg-event functions) moved into a webworker, where only react rendering is handled on the screen thread, allowing for buttery-smooth components backed by large data transformations in the workers.
+
+<img width="1298" alt="Screen Shot 2022-07-30 at 5 46 23 PM" src="https://user-images.githubusercontent.com/127271/181997138-66025f77-7d87-45b1-9697-73d5c7d77e26.png">
+
 ## `spawn`
 There are a few ways you can `spawn` a worker.
 
