@@ -1,2 +1,11 @@
 {:deps {org.clojure/clojurescript {:mvn/version "1.10.758"}
-        net.clojars.john/injest {:mvn/version "0.1.0-beta.8"}}}
+        net.clojars.john/injest {:mvn/version "0.1.0-beta.8"}}
+ :aliases
+ {:test
+  {:extra-paths ["test"]
+   :extra-deps {org.clojure/test.check {:mvn/version "1.1.0"}
+                io.github.cognitect-labs/test-runner
+                {:git/tag "v0.5.0" :git/sha "48c3c67"}}}
+  :build {:deps {io.github.seancorfield/build-clj
+                 {:git/tag "v0.3.1" :git/sha "996ddfa"}}
+          :ns-default build}}}

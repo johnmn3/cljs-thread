@@ -14,8 +14,7 @@ The `in` macro then abstracts over the message passing infrastructure, allowing 
 Place the following in the `:deps` map of your `deps.edn` file:
 ```
 ...
-johnmn3/inmesh {:git/url "https://github.com/johnmn3/inmesh.git"
-                :sha     "e21bfe4b08d5a3185674a2557741b41f939bf4c6"}
+net.clojars.john/inmesh {:mvn/version "0.1.0-alpha.1"}
 ...
 ```
 ### Build Tools
