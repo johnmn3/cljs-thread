@@ -1,7 +1,6 @@
 (ns inmesh.state
   (:require
-   [inmesh.env :as e]
-   [inmesh.util :as u]))
+   [inmesh.env :as e]))
 
 (def initial-conf (merge {} (:conf e/data)))
 
@@ -23,8 +22,6 @@
   (atom {}))
 
 (def future-pool (atom {:available #{} :in-use #{}}))
-
-(def fallback-db (atom {}))
 
 (def idb (atom nil))
 

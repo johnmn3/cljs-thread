@@ -4,5 +4,17 @@
 
 (defmacro spawn [& x]
   (let [[conveyer names opts body] (i/locals-and-args &env x)
-        afn `(fn ~names ~@body)]
-    `(inmesh.spawn/do-spawn ~conveyer ~opts (clojure.core/str ~afn))))
+        yield? (i/yields? x)
+        yfn (if-not yield?
+              `(fn ~names ~@body)
+              `(fn [in-id#]
+                 (fn ~names
+                   (let [~'yield (fn [& res#]
+                                   (inmesh.sync/send-response
+                                    {:request-id in-id# :response (last res#)})
+                                   (when (not (:deamon? inmesh.env/data))
+                                     (js/setTimeout #(.close js/self) 100)))]
+                     ~@body))))]
+    (if-not (seq body)
+      `(inmesh.spawn/do-spawn [] ~opts nil)
+      `(inmesh.spawn/do-spawn ~conveyer (assoc ~opts :yield? ~yield?) (clojure.core/str ~yfn)))))

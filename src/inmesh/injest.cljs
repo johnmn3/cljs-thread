@@ -1,27 +1,26 @@
 (ns inmesh.injest
   (:require-macros
-   [inmesh.injest :refer [=>> tfan]]
-   [inmesh.in :refer [in]]
-   [inmesh.spawn :refer [spawn]])
+   [inmesh.injest])
   (:require
    [inmesh.util :as u]
    [inmesh.state :as s]
-   [inmesh.spawn]
+   [inmesh.spawn :refer [spawn]]
+   [inmesh.in :refer [in]]
    [injest.impl]
-   [injest.path :refer [x>>]]))
+   [injest.path]))
 
-(defn mk-injest-ids [n] 
+(defn mk-injest-ids [n]
   (let [ws (-> n (or (u/num-cores) (/ 2)))]
     (->> ws range (map #(keyword (str "injest-" %))))))
 
 (defn start-injests [configs]
   (when (or (:injest configs) (:injest-count configs) (:injest-connect-string configs))
-    (let [injest-count (:injest-count configs 4)]
+    (let [injests (-> configs (:injest-count 8) mk-injest-ids)]
       (spawn {:id :injest :opts {:no-res? true}}
              (s/update-conf! configs))
-      (->> (mk-injest-ids injest-count)
+      (->> injests
            (mapv (fn [wid]
-                   (spawn {:id wid :opts {:no-res true}}
+                   (spawn {:id wid :opts {:no-res? true}}
                           (s/update-conf! configs))))))))
 
 (def ^:dynamic *par* nil)
@@ -29,8 +28,8 @@
 (defn fan [xf args & {:keys [par chunk]}]
   (let [injest-count (:injest-count @s/conf 4)
         n-pws (or *par* par (* injest-count 8))
-        pws (take n-pws (cycle (mk-injest-ids (:injest-count @s/conf 4))))
-        args-parts (partition-all n-pws (partition-all (or *chunk* chunk 2048) args))]
+        pws (take n-pws (cycle (mk-injest-ids (:injest-count @s/conf 8))))
+        args-parts (partition-all n-pws (partition-all (or *chunk* chunk 512) args))]
     (->> args-parts
          (map (fn [ags]
                 (->> ags
@@ -40,78 +39,3 @@
                            pws))))
          (mapcat #(map deref %))
          (apply concat))))
-
-;; (defn fan-xfn [xf-group]
-;;   (fn [args]
-;;     (fan #(i/compose-transducer-group xf-group) (vec args))))
-
-;; (defn flip [n]
-;;   (apply comp (take n (cycle [inc dec]))))
-
-;; ;; (defn flip [n]
-;; ;;   (apply comp (take n (cycle [inc dec]))))
-
-;; (comment
-;;   (->> [1 2 3 4]
-;;        (sequence (i/compose-transducer-group [[map inc] [map inc]])))
-;;   (->> [1 2 3 4]
-;;        ((fan-xfn [[map inc] [map inc]])))
-;;   (fan #(i/compose-transducer-group [[map inc] [map inc]]) [1 2 3])
-;;   ((tfan [[map inc] [map inc]]) [1 2 3])
-
-;;   (=>> [1 2 3]
-;;        (map inc)
-;;        (map inc))
-
-;;   (->> (range 1000000)
-;;        (map inc)
-;;        (filter odd?)
-;;        (map (flip 100))
-;;        (mapcat #(do [% (dec %)]))
-;;        (partition-by #(= 0 (mod % 5)))
-;;        (map (partial apply +))
-;;        (map (partial + 10))
-;;        (map (flip 100))
-;;        (map (flip 1000))
-;;        (map #(do {:temp-value %}))
-;;        (map :temp-value)
-;;        (filter even?)
-;;        (apply +)
-;;        println
-;;        time)
-
-;;   (x>> (range 1000000)
-;;        (map inc)
-;;        (filter odd?)
-;;        (map (flip 100))
-;;        (mapcat #(do [% (dec %)]))
-;;        (partition-by #(= 0 (mod % 5)))
-;;        (map (partial apply +))
-;;        (map (partial + 10))
-;;        (map (flip 100))
-;;        (map (flip 1000))
-;;        (map #(do {:temp-value %}))
-;;        (map :temp-value)
-;;        (filter even?)
-;;        (apply +)
-;;        println
-;;        time)
-
-;;   (binding [#_#_*par* 64 #_#_*chunk* 16384]
-;;     (=>> (range 1000000)
-;;          (map inc)
-;;          (filter odd?)
-;;          (map (flip 100))
-;;          (mapcat #(do [% (dec %)]))
-;;          (partition-by #(= 0 (mod % 5)))
-;;          (map (partial apply +))
-;;          (map (partial + 10))
-;;          (map (flip 100))
-;;          (map (flip 1000))
-;;          (map #(do {:temp-value %}))
-;;          (map :temp-value)
-;;          (filter even?)
-;;          (apply +)
-;;          println
-;;          time))
-

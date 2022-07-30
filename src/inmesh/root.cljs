@@ -3,17 +3,22 @@
    [inmesh.env :as e]
    [inmesh.state :as s]
    [inmesh.spawn :refer [spawn]]
-   [inmesh.spawn :as sp]
    [inmesh.on-when :refer [on-when]]
    [inmesh.future :as f]
    [inmesh.injest :as i]
-   [inmesh.in :refer [in]]
-   [inmesh.idb :as idb]))
+   [inmesh.util :as u]))
 
 (defn start-repl [configs]
   (when (and goog/DEBUG (:repl-connect-string configs))
     (spawn {:id :repl :opts {:no-res? true}}
            (s/update-conf! configs))))
+
+(defn after-db [config]
+  (spawn {:id :core :opts {:no-res? true}}
+         (s/update-conf! config)
+         (on-when (contains? @s/peers :db)
+                  (reset! s/ready? true)))
+  (start-repl config))
 
 (defn ^:export init-root! [& [config-map]]
   (assert (e/in-root?))
@@ -23,9 +28,9 @@
     (on-when (contains? @s/peers :sw)
       (f/start-futures config)
       (i/start-injests config)
-      (spawn {:id :db :opts {:no-res? true}}
-             (idb/idb-open))
-      (spawn {:id :core :opts {:no-res? true}}
-             (s/update-conf! config))
-      (start-repl config)
-      (in :core (reset! s/ready? true)))))
+      (if (u/in-safari?)
+        (do (spawn {:id :db :opts {:no-res? true}}
+                   (println :in-db :spawn-effect))
+            (after-db config))
+        (spawn {:id :db :opts {:no-res? true}}
+               (after-db config))))))

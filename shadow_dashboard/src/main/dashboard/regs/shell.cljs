@@ -1,9 +1,9 @@
 (ns dashboard.regs.shell
   (:require
    [dashboard.regs.db :as db]
-   [re-frame.core :as rf :refer [subscribe]]
-   [inmesh.core :as mesh :refer [in]]
-   [inmesh.re-frame :refer [reg-sub dispatch]]))
+   [re-frame.core :as rf]
+  ;;  [inmesh.core :as mesh :refer [in]]
+   [inmesh.re-frame :refer [reg-sub]]))
 
 ;; subs
 (reg-sub

@@ -1,13 +1,12 @@
 (ns inmesh.future
   (:require-macros
-   [inmesh.future :refer [future]]
-   [inmesh.in :refer [in]]
-   [inmesh.spawn :refer [spawn]]
-   [inmesh.on-when :refer [on-when]])
+   [inmesh.future])
   (:require
    [inmesh.util :as u]
    [inmesh.env :as e]
-   [inmesh.spawn]
+   [inmesh.spawn :refer [spawn]]
+   [inmesh.on-when :refer [on-when]]
+   [inmesh.in :refer [in]]
    [inmesh.state :as s]
    [inmesh.sync :as sync]))
 
@@ -41,12 +40,11 @@
   (when (or (:future configs) (:future-count configs) (:future-connect-string configs))
     (let [future-ids (mk-worker-ids (:future-count configs 4))
           future-conf (assoc configs :future-ids future-ids)]
-      ;; (println :in-root :future-ids future-ids)
       (spawn {:id :future :opts {:no-res? true}}
              (init-future! future-conf))
       (->> future-ids
            (mapv (fn [fid]
-                   (spawn {:id fid :opts {:no-res true}}
+                   (spawn {:id fid :opts {:no-res? true}}
                           (s/update-conf! future-conf))))))))
 
 (defn do-future [args afn opts]

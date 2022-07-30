@@ -1,8 +1,7 @@
 (ns dashboard.views.home-panel
   (:require
-   [inmesh.re-frame :as rf :refer [dispatch subscribe]]
+   [inmesh.re-frame :refer [subscribe]]
    [dashboard.footer :refer [copyright]]
-   [reagent.core :refer [adapt-react-class]]
    ["react-chartjs-2" :refer [Line]]
    [comp.el :as c]))
 
@@ -59,7 +58,7 @@
       :data [124, 144, 133, 277, 156, 188, 140]}]}))
 
 (defn chart [{:keys [^js classes]}]
-  (let [chart-data (rf/subscribe [:home-panel/chart-data])]
+  (let [chart-data (subscribe [:home-panel/chart-data])]
     [:<>
      [c/container {:justifyContent "space-between"}
       [c/item
@@ -94,7 +93,7 @@
 
 
 (defn orders [{:keys [^js classes]}]
-  (let [orders (rf/subscribe [:home-panel/orders])]
+  (let [orders (subscribe [:home-panel/orders])]
     [:<>
      [c/text {:component "h2" :variant "h6" :color "primary" :gutter-bottom true}
       "Log"]

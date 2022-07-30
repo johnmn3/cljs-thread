@@ -1,4 +1,3 @@
-;; shadow-cljs configuration
 {:nrepl
  {:port 8777}
 
@@ -17,12 +16,10 @@
   :sw
   {:target :browser
    :output-dir "resources/public"
-   :modules {:sw {;:entries [dashboard.core]
-                  :init-fn inmesh.sw/init!
+   :modules {:sw {:entries [inmesh.sw]
                   :web-worker true}}}
   :core
   {:target     :browser
-   :compiler-options {:output-wrapper false}
    :output-dir "resources/public" ; <- necessary because sw.js must be in root, but output-dir doesn't work per module
    :js-options {:resolve {"highlight.js" {:target :npm :require "highlight.js/lib/core"}
                           "lowlight" {:target :npm :require "lowlight/lib/core"}}}

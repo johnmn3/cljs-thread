@@ -1,10 +1,9 @@
 (ns inmesh.sync
   (:require
+   [cljs.reader :refer [register-tag-parser!]]
    [inmesh.util :as u]
    [inmesh.env :as e]
    [inmesh.state :as s]
-   [inmesh.msg :as m]
-   [inmesh.idb :as idb]
    [inmesh.id :refer [IDable get-id]]
    [clojure.edn :as edn]))
 
@@ -48,8 +47,6 @@
 (defn send-response [payload & [db?]]
   (throw-if-non-blocking)
   (try
-    (when db?
-      (idb/idb-set! (:request-id payload) (:response payload)))
     (let [req (if db?
                 {:responder (:id e/data) :db? db?}
                 {:payload payload :responder (:id e/data)})
@@ -65,60 +62,63 @@
 
 (extend-type js/Promise
   ICloneable
-  (-clone [p] (.then p))
-  IDable
-  (get-id [p] p))
+  (-clone [p] (.then p)))
 
 (extend-type string
   ICloneable
-  (-clone [s] (js/String. s))
-  IDable
-  (get-id [s] s))
+  (-clone [s] (js/String. s)))
 
 (extend-type cljs.core/Keyword
   ICloneable
-  (-clone [k] (keyword k))
-  IDable
-  (get-id [k] k))
+  (-clone [k] (keyword k)))
 
-(defn wrap-derefable [{:keys [promise? id efn]}]
-  (let [id (if (instance? IDable id) (get-id id) id)
-        resolved? (atom false)
-        resolved-value (atom nil)
-        p (if-not (or efn (e/in-root?) (e/in-screen?) promise?)
-            id
-            (-> (js/Promise. (if efn #(request id %1 %2) #(do id)))
-                (.then (fn [result]
-                         (reset! resolved? true)
-                         (reset! resolved-value result)
-                         (if (:error result)
-                           (throw (ex-info "Error in remote call" {:result (pr-str result)}))
-                           result)))))]
-    (specify p
-             IDable
-             (get-id [_] id)
-             IPending
-             (-realized? [_] @resolved?)
-             IPrintWithWriter
-             (-pr-writer [x writer opts]
-                         (-write writer (str "#object[inmesh.core " id " "))
-                         (pr-writer {:status (if @resolved? :ready :pending)
-                                     :val @resolved-value}
-                                    writer opts)
-                         (-write writer "]"))
-             IDeref
-             (-deref [_]
-                     (if-let [res @resolved-value]
-                       res
-                       (if (or (e/in-root?) (e/in-screen?) promise?)
-                         p
-                         (let [_ (throw-if-non-blocking)
-                               res (request id)]
+(defn wrap-derefable [{:keys [promise? id] :as data} & [{:keys [delay?]}]]
+  (when-not (:no-res? (:opts data))
+    (let [id (if (instance? IDable id) (get-id id) id)
+          resolved? (atom false)
+          resolved-value (atom nil)
+          promise? (if (or (e/in-root?) (e/in-screen?)) true promise?)
+          p (if-not promise?
+              id
+              (-> (js/Promise. (if (not delay?)
+                                 #(request id %1 %2)
+                                 #(do id)))
+                  (.then (fn [result]
                            (reset! resolved? true)
-                           (reset! resolved-value res)
-                           (if (:error res)
-                             (throw (ex-info "Error in remote call" {:results (pr-str res)}))
-                             res))))))))
+                           (reset! resolved-value result)
+                           (if (:error result)
+                             (throw (ex-info "Error in remote call" {:result (pr-str result)}))
+                             result)))))]
+      (specify p
+               IDable
+               (get-id [_] id)
+               IPending
+               (-realized? [_] @resolved?)
+               IPrintWithWriter
+               (-pr-writer [x writer opts]
+                           (-write writer
+                                   (str "#inmesh {:id "
+                                        (if (keyword? id)
+                                          id
+                                          (pr-str id))
+                                        "}")))
+               IDeref
+               (-deref [_]
+                       (if-let [res @resolved-value]
+                         res
+                         (if (or (e/in-root?) (e/in-screen?) promise?)
+                           p
+                           (let [_ (throw-if-non-blocking)
+                                 res (request id)]
+                             (reset! resolved? true)
+                             (reset! resolved-value res)
+                             (if (:error res)
+                               (throw (ex-info "Error in remote call" {:results (pr-str res)}))
+                               res)))))))))
+
+(register-tag-parser!
+  'inmesh (fn [x]
+            (wrap-derefable x)))
 
 (defn sleep [n]
   (throw-if-non-blocking)

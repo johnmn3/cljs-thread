@@ -1,11 +1,8 @@
 (ns dashboard.regs.db
   (:require
-   [clojure.edn :as edn]
-   [re-frame.core :as rf :refer [subscribe reg-cofx inject-cofx]]
-   [inmesh.core :as mesh :refer [in wait spawn]]
+   [re-frame.core :as rf]
    [inmesh.env :refer [in-core?]]
-   [inmesh.state :as s]
-   [inmesh.re-frame :refer [reg-sub dispatch]]
+   [inmesh.re-frame :refer [reg-sub]]
    [inmesh.db :refer [db-get db-set!]]))
  
 (def ls-key "local-store")
@@ -22,11 +19,11 @@
    rf/trim-v])
 
 (when (in-core?)
-  (rf/reg-cofx
-   :local-store
-   (fn [cofx second-param]
-     (let [local-store (or (db-get ls-key) {})]
-       (assoc cofx :app-state local-store)))))
+    (rf/reg-cofx
+     :local-store
+     (fn [cofx second-param]
+       (let [local-store (or (db-get ls-key) {})]
+         (assoc cofx :app-state local-store)))))
 
 (def default-db
   {:dark-theme? false
@@ -108,17 +105,17 @@
 
 ;; subs
 
-(rf/reg-sub
+(reg-sub
  :db
  (fn [db]
    db))
 
-(rf/reg-sub
+(reg-sub
  :dark-theme?
  (fn [db]
    (:dark-theme? db)))
 
-(rf/reg-sub
+(reg-sub
  :errors
  (fn [db]
    (:errors db)))
@@ -129,7 +126,8 @@
  :initialize-db
  [(rf/inject-cofx :local-store)]
  (fn [{:as cofx :keys [db app-state]} second-param]
-   {:db (merge default-db app-state)}))
+   (let [new-db (merge default-db (or app-state {}))]
+     {:db new-db})))
 
 (rf/reg-event-db
  :toggle-dark-theme

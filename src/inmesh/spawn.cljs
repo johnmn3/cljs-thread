@@ -1,6 +1,6 @@
 (ns inmesh.spawn
   (:require-macros
-   [inmesh.spawn :refer [spawn]])
+   [inmesh.spawn])
   (:require
    [inmesh.util :as u]
    [inmesh.state :as s]
@@ -12,38 +12,31 @@
   (-> p
       (.then #(if (or (.-active %) (.-installing %))
                 (afn %)
-                (.addEventListener
-                 (.-installing %) "onstatechange"
-                 (partial afn %))))))
+                (when (.-installing %)
+                  (.addEventListener
+                   (.-installing %) "onstatechange"
+                   (partial afn %)))))))
 
 (defn on-sw-registration-reload []
   (-> (js/navigator.serviceWorker.getRegistration)
       (.then #(when-not (.-controller js/navigator.serviceWorker)
                 (.reload js/window.location)))))
 
-(defn on-sw-ready [afn]
-  (-> (js/navigator.serviceWorker.getRegistration)
-      (.then js/navigator.serviceWorker.ready)
-      (.then #(afn %))))
-
 (defn link [id]
   (when-not (-> @s/peers (get-in [id :port]))
     (if (e/in-screen?)
       (when-not (= id :sw)
-        (if-not (= id :root)
-          (do (println :can-only-spawn :root :or :service-worker :in-screen)
-              (throw (ex-info "Can only spawn :root or the service worker (:sw) in screen" {})))
-          (m/add-port id (-> @s/peers (get-in [id :w])))))
+        (m/add-port id (-> @s/peers (get-in [id :w]))))
       (let [[c1 c2] (m/mk-chan-pair)]
         (m/send-port id c1)
         (m/add-port id c2)))))
 
 (defn get-connection-string [{:keys [id]}]
-  (let [sw-override (:sw-connect-string @s/conf "sw.js")
+  (let [sw-override (:sw-connect-string @s/conf "/sw.js")
         core-override (:core-connect-string @s/conf "/core.js")
         root-override (:root-connect-string @s/conf core-override)
-        future-override (:future-connect-string @s/conf core-override)
-        future-override (:injest-connect-string @s/conf core-override)
+        future-override (:future-connect-string @s/conf root-override)
+        future-override (:injest-connect-string @s/conf root-override)
         repl-override (:repl-connect-string @s/conf core-override)]
     (cond
       (= :sw id) sw-override
@@ -52,9 +45,8 @@
       (= :future id) future-override
       (= :injest id) future-override
       (= :core id) core-override
-      :else core-override)))
+      :else root-override)))
 
-(def ready? (atom false))
 (declare do-spawn)
 
 (defn spawn-sw [init-callback]
@@ -81,7 +73,7 @@
         (m/post id
                 {:dispatch :call
                  :data (merge
-                        {:sfn (str (fn [] #_(reset! ready? true))) :from (:id e/data) :to id}
+                        {:sfn (str (fn [])) :from (:id e/data) :to id}
                         {:opts {:no-res? true}})})))
     id))
 
@@ -94,8 +86,8 @@
                       (m/dist-port id % c1 c2))))))))
 
 (defn local-spawn [{:as data :keys [deamon?]}]
-  (assert (or (and (e/in-root?) (not (= (:id data) :sw)))
-              (and (e/in-screen?) (or (= (:id data) :root) (= (:id data) :sw)))))
+  (assert (or (and (e/in-root?) (not (u/in-safari?)) (not (= (:id data) :sw)))
+              (e/in-screen?)))
   (let [id (root-spawn data)]
     (when-not (= id :sw)
       (when deamon? (meshify id)))
@@ -103,7 +95,7 @@
 
 (defmethod m/dispatch :spawn
   [{:keys [data]}]
-  (if-not (or (e/in-root?) (and (e/in-screen?) (or (= :sw (:id data)) (= :root (:id data)))))
+  (if-not (or (e/in-screen?) (and (not (u/in-safari?)) (e/in-root?)))
     (throw (js/Error. "Can't spawn locally if not on root or screen"))
     (local-spawn data)))
 
@@ -112,30 +104,20 @@
           {:dispatch :spawn
            :data data}))
 
-
-(defn parse-args [[data afn]]
-  (if (map? data) [data afn] [{} data]))
-
-(defn parse-in [x]
-  (let [f (first x)
-        s (second x)
-        t (first (rest (rest x)))]
-    (cond (and (vector? f) (map? s)) [f s t]
-          (vector? f) [f {} s]
-          (map? f) [[] f s]
-          :else [[] {} f])))
-
-(defn ^:export do-spawn [eargs {:as data :keys [caller id]} efn]
+(defn ^:export do-spawn [eargs {:as data :keys [caller id yield?]} efn]
   (let [{:as data :keys [id]}
         (merge data
                {:from (:id e/data) :to :root}
                (if (and (not id) efn)
-                 {:id (u/gen-id data)}
+                 (if yield?
+                   (let [in-id (u/gen-id data)]
+                     {:id in-id :in-id in-id})
+                   {:id (u/gen-id data)})
                  {:deamon? true
                   :id (or id (u/gen-id data))})
                (when-not caller {:caller (:id e/data)})
                (when efn {:efn (str efn) :eargs eargs}))]
-    (if (= :sw id)
+    (if (or (u/in-safari?) (= :sw id))
       (if (e/in-screen?)
         (local-spawn data)
         (send-spawn :screen data))
@@ -144,4 +126,4 @@
         (if (and (e/in-screen?) (= id :root))
           (local-spawn data)
           (send-spawn :root data))))
-    (sync/wrap-derefable data)))
+    (sync/wrap-derefable data {:delay? (if yield? true false)})))

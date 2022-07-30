@@ -26,3 +26,6 @@
 
 (defn in-branch? []
   (and (not (in-screen?)) (not (in-root?))))
+
+(def current-browser
+  (u/browser-type))

@@ -4,5 +4,13 @@
 
 (defmacro in [id & x]
   (let [[conveyer names opts body] (i/locals-and-args &env x)
-        afn `(fn ~names ~@body)]
-    `(inmesh.in/do-in ~id ~conveyer (clojure.core/str ~afn) ~opts)))
+        yield? (i/yields? x)
+        yfn (if-not yield?
+              `(fn ~names ~@body)
+              `(fn [in-id#]
+                 (fn ~names
+                   (let [~'yield (fn [res#]
+                                   (inmesh.sync/send-response
+                                    {:request-id in-id# :response res#}))]
+                     ~@body))))]
+    `(inmesh.in/do-in ~id ~conveyer (clojure.core/str ~yfn) (assoc ~opts :yield? ~yield?))))

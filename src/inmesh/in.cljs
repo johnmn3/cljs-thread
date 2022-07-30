@@ -1,22 +1,26 @@
 (ns inmesh.in
   (:require-macros
-   [inmesh.in :refer [in]])
+   [inmesh.in])
   (:require
    [inmesh.util :as u]
    [inmesh.on-when :refer [on-when]]
    [inmesh.env :as e]
    [inmesh.state :as s]
+   [inmesh.id :refer [IDable get-id]]
    [inmesh.msg :as m]
    [inmesh.sync :as sync]))
 
 (defn do-call
   [{:keys [data] :as outer-data}]
-  ;; (println :do-call data)
-  (let [{:keys [sfn sargs opts]} data
+  (let [{:keys [sfn sargs opts in-id]} data
         res (try
               (if-not sargs
-                (js/eval (str "(" sfn ")();"))
-                (apply (js/eval (str "(function () {return (" sfn ");})();"))
+                (if (and in-id (:yield? opts))
+                  ((js/eval (str "(" sfn ")();")) in-id)
+                  (js/eval (str "(" sfn ")();")))
+                (apply (if (and in-id (:yield? opts))
+                         ((js/eval (str "(function () {return (" sfn ");})();")) in-id)
+                         (js/eval (str "(function () {return (" sfn ");})();")))
                        (if (vector? sargs)
                          (->> sargs (mapv #(if (and (string? %) (.startsWith % "#in/mesh"))
                                              (js/eval (str "(function () {return (" (apply str (drop 9 %)) ");})();"))
@@ -31,7 +35,7 @@
                   (sync/send-response {:request-id (:request-id opts) :response {:error (pr-str e)}}))))]
     (when (:atom? opts)
       (reset! s/local-val res))
-    (when (and (not (:no-res? opts)) (not (e/in-sw?)))
+    (when (and (not (:yield? opts)) (not (:no-res? opts)) (not (e/in-sw?)))
       (sync/send-response {:request-id (:request-id opts) :response res}))))
 
 
@@ -43,10 +47,16 @@
   (let [[afn args] (if afn [afn args] [args nil])
         in-id (u/gen-id)
         sargs (->> args (mapv #(if (fn? %) (str "#in/mesh " %) %)))
+        id (if (satisfies? IDable id)
+             (get-id id)
+             id)
+        id (if (keyword id)
+             id
+             (pr-str id))
         post-in #(m/post id
                          {:dispatch :call
                           :data (merge
-                                 {:sfn afn :from (:id e/data) :to id}
+                                 {:sfn afn :to id :in-id in-id}
                                  (when args
                                    {:sargs sargs})
                                  (when opts

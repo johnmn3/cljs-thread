@@ -1,17 +1,16 @@
 (ns dashboard.regs.home-panel
   (:require
-   [re-frame.core :as rf :refer [subscribe]]
-   [inmesh.core :as mesh :refer [in]]
-   [inmesh.re-frame :refer [reg-sub dispatch]]))
+   [re-frame.core :as rf]
+   [inmesh.re-frame :refer [reg-sub]]))
 
 ;;; Subs
 
-(rf/reg-sub
+(reg-sub
  :home-panel/orders
  (fn [db]
    (:home-panel/orders db)))
 
-(rf/reg-sub
+(reg-sub
  :home-panel/chart-data
  (fn [db]
    (:home-panel/chart-data db)))

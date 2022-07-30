@@ -4,8 +4,7 @@
    [inmesh.env :as e]
    [inmesh.on-when :refer [on-when]]
    [inmesh.state :as s]
-   [inmesh.util :as u]
-   [inmesh.idb :as idb]))
+   [inmesh.util :as u]))
 
 (defn ^:export respond [id res]
   (swap! s/responses assoc id res))
@@ -45,7 +44,7 @@
                                      (println :event (pr-str e))
                                      (println :url (pr-str u))
                                      (println :handle-request (pr-str r))
-                                     (js/Promise.resolve (clj->js {:error %}))))))))
+                                     (js/Promise.resolve (response (clj->js {:error %})))))))))
 
 (defn handle-respond [e]
   (-> (-> e .-request .clone .text)
@@ -67,7 +66,7 @@
 (when (e/in-sw?)
 
   (.addEventListener js/self "install" #(js/self.skipWaiting))
-  (.addEventListener js/self "activate" #(js/self.clients.claim))
+  (.addEventListener js/self "activate" #(.waitUntil % (js/self.clients.claim)))
   (.addEventListener js/self "fetch" fetch-response)
 
   :end)

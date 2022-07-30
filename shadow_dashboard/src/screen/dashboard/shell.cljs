@@ -3,11 +3,11 @@
    [reagent.core :as reagent]
    [comp.el :as c]
    [re-frame.core]
-   [inmesh.re-frame :as rf :refer [dispatch subscribe]]
+   [inmesh.re-frame :refer [dispatch subscribe]]
    [reitit.frontend.easy :as rfe]
    [dashboard.routes :as routes]
-   [reitit.core :as reitit]
-   [inmesh.core :as mesh :refer [in]]))
+   [reitit.core :as reitit]))
+  ;;  [inmesh.core :as mesh :refer [in]]))
 
 ;; styles
 
@@ -96,10 +96,10 @@
 (defn account-menu []
   (let [anchor-el (reagent/atom nil)]
     (fn []
-      (let [a-open? @(rf/subscribe [:account-menu/open?])
-            a-close #(rf/dispatch [:account-menu/toggle])]
+      (let [a-open? @(subscribe [:account-menu/open?])
+            a-close #(dispatch [:account-menu/toggle])]
         [:div
-         [c/icon-button {:on-click #(do (rf/dispatch [:account-menu/toggle])
+         [c/icon-button {:on-click #(do (dispatch [:account-menu/toggle])
                                         (reset! anchor-el (.-currentTarget %)))}
           [c/avatar]]
          [c/menu {:anchor-el @anchor-el
@@ -120,8 +120,8 @@
             "Logout"]]]))))
 
 (defn dashboard [{:keys [class-name]}]
-  (let [open? @(rf/subscribe [:drawer/open?])
-        dark-theme? @(rf/subscribe [:dark-theme?])
+  (let [open? @(subscribe [:drawer/open?])
+        dark-theme? @(subscribe [:dark-theme?])
         router routes/router
         current-route @(re-frame.core/subscribe [:current-route])]
     [c/box {:class [class-name (:root classes)]}
@@ -132,8 +132,8 @@
                        :color "inherit"
                        :aria-label "open drawer"
                        :on-click #(if open?
-                                    (rf/dispatch [:drawer/close])
-                                    (rf/dispatch [:drawer/open]))
+                                    (dispatch [:drawer/close])
+                                    (dispatch [:drawer/open]))
                        :class [(:menu-button classes)]}
         [c/menu-icon]]
        [c/text {:component "h1"
@@ -166,7 +166,7 @@
       [c/list-items
        [c/list-item {:button true
                      :style {:left 5 :top 10}
-                     :on-click #(rf/dispatch [:toggle-dark-theme])}
+                     :on-click #(dispatch [:toggle-dark-theme])}
         [c/list-item-icon [c/switch {:size "small" :checked (or dark-theme? false)}]]
         [c/list-item-text {:primary "Toggle Theme"}]]]]
      [:main {:class (:content classes)}

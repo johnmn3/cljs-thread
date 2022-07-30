@@ -1,28 +1,24 @@
 (ns dashboard.core
   (:require
-   [re-frame.core :as rf :refer [dispatch dispatch-sync]]
-   [inmesh.re-frame :refer [dispatch]]
+   [re-frame.core :as rf]
    [dashboard.regs.db]
    [dashboard.regs.home-panel]
    [dashboard.regs.shell]
    [dashboard.regs.sign-in]
-   [inmesh.state :as state]
    [inmesh.env :as env]
-   [inmesh.state :as s]
-   [inmesh.msg :as msg]
-   [inmesh.id :refer [IDable get-id]]
-   [inmesh.core :as mesh :refer [future spawn in wait =>> on-when]]))
+   [inmesh.core :as mesh :refer [future spawn in =>>]]))
 
 (enable-console-print!)
 
 (defn init! []
   (when (env/in-core?)
-    (rf/dispatch-sync [:initialize-db]))
-  (rf/clear-subscription-cache!))
+    (rf/dispatch-sync [:initialize-db])
+    (rf/clear-subscription-cache!)))
 
 (defn flip [n]
-  (apply comp (take n (cycle [inc dec]))))
+  (apply comp (take n (cycle [inc inc dec]))))
 
+#_
 (when (env/in-core?)
  ;(on-when @s/ready?
   (future 
@@ -46,7 +42,8 @@
                 (map (flip 10))
                 (take 10)))
 
-    (print '-> 'large-computation \newline
+    #_
+    (print '->> 'large-computation \newline
            (->> (range)
                 (map (flip 100))
                 (map (flip 100))
@@ -55,6 +52,7 @@
                 (apply +)
                 time))
 
+    #_
     (print '=>> 'large-computation \newline 
            (=>> (range)
                 (map (flip 100))
@@ -66,65 +64,135 @@
 
 (comment
 
-  (println :future '(+ 1 2)
-           @(future (+ 1 2)))
+  (def s1 (spawn))
 
-  (println :future '(let [x 1] (+ x 2))
-           @(future (let [x 1] (+ x 2))))
+  (spawn (println :addition (+ 1 2 3)))
 
-  (let [x @(future (+ 1 2))
-        y @(future (+ x 3))
-        z @(future (+ x y))]
-    (println :let-local-futures (+ x y z)))
+  (def s2 (spawn {:id :s2} (println :hi :from mesh/id)))
 
-  (pr (deref (in :core (+ 1 2 3))))
-  (println :res @(in :injest (println :hi) 1))
+  (println :ephemeral :result @(spawn (+ 1 2 3)))
 
-  (println :res @(in :db (println :hi) 2))
-  (println :res (wait :db (println :hi) (yield 2)))
-  (println :res (wait :core (println :hi) (yield 2)))
-  (println :peers (keys @s/peers))
-  (println :peers (select-keys @s/peers [:sw]))
-  (println :res (in :sw (println :responses @s/responses)))
-  (in :db (println :peers (keys @s/peers)))
-  (in :sw (println :peers (keys @s/peers)))
-  (in :sw (println :hi))
-  (in :root (in :sw (println :hi)))
-  (in :core (println :hi))
-  (in :root (println :peers (keys @s/peers)))
-  (in :screen (println :peers (keys @s/peers)))
-  (in :core (println :peers (keys @s/peers)))
+  (in :screen
+      (-> (spawn (+ 1 2 3))
+          (.then #(println :ephemeral :result %))))
 
-  (in :here (println :afn (pr-str (str "(" (str (fn [] :hi)) ")"))))
+  (-> (js/Promise.all #js [(spawn {:promise? true} 1)
+                           (spawn {:promise? true} 2)])
+      (.then #(println :res (js->clj %))))
+
+  (in s1 (println :hi :from :s1))
+
+  (in s1 ;[s2]
+      (println ":now :we're :in :s1")
+      (in :s2
+          (println ":now :we're :in :s2 :through :s1")))
+
+  @(in s1 (+ 1 @(in :s2 (+ 2 3))))
+
+  (let [x 3]
+    @(in s1 (+ 1 @(in :s2 (+ 2 x)))))
+
+  (def x 3)
+  @(in s1 (+ 1 @(in :s2 (+ 2 x)))) ; <- won't work
+
+  (def x 3)
+  @(in s1 [x] (+ 1 @(in :s2 (+ 2 x))))
+
+  @(in s1 [x s2] (+ 1 @(in s2 (+ 2 x))))
+
+  (let [y 3]
+    @(in s1 [x s2] (+ 1 @(in s2 (+ x y))))) ; <- won't work
+
+  (let [y 3]
+    @(in s1 [x y s2] (+ 1 @(in s2 (+ x y)))))
+
+  (let [x 6]
+    @(spawn (yield (+ x 2)) (println :i'm :ephemeral :in mesh/id)))
+
+  @(spawn (+ 1 @(spawn (+ 2 3))))
+
+  (->> @(in s1 (-> (js/fetch "http://api.open-notify.org/iss-now.json")
+                   (.then #(.json %))
+                   (.then #(yield (js->clj % :keywordize-keys true)))))
+       :iss_position
+       (println "ISS Position:"))
+
+  (defn post [url headers data]
+    (let [response-post @(future (-> got (.post url (clj->js {:headers headers :json data})) .json yield))]
+      (println (js->clj response-post :keywordize-keys true))))
+
+  @(spawn (js/setTimeout
+           #(yield (println :finally!) (+ 1 2 3))
+           5000))
+
+  @(future (+ 1 @(future (+ 2 3))))
+
+  (in :screen
+      (-> (future (-> (js/fetch "http://api.open-notify.org/iss-now.json")
+                      (.then #(.json %))
+                      (.then #(yield (js->clj % :keywordize-keys true)))))
+          (.then #(println "ISS Position:" (:iss_position %)))))
+
+  (=>> (range)
+       (map (flip 100000))
+       (filter even?)
+       (map (flip 100000))
+       (filter odd?)
+       (map (flip 100000))
+       (filter even?)
+       (map (flip 100000))
+       (take 1000)
+       (apply +)
+       time)
+
+  (->> (range 1000)
+       (map inc)
+       (filter odd?)
+       (map (flip 100000))
+       (mapcat #(do [% (dec %)]))
+       (partition-by #(= 0 (mod % 5)))
+       (map (partial apply +))
+       (map (partial + 10))
+       (map (flip 100000))
+       (map #(do {:temp-value %}))
+       (map :temp-value)
+       (map (flip 100000))
+       (filter even?)
+       (apply +)
+       time)
+
+  (->> (range 10000)
+       (map (flip 10000))
+       (apply +)
+       time)
+
+  (=>> (range 10000)
+       (map (flip 10000))
+       (apply +)
+       time)
+
+  (=>> (range 1000)
+       (map inc)
+       (filter odd?)
+       (map (flip 100000))
+       (mapcat #(do [% (dec %)]))
+       (partition-by #(= 0 (mod % 5)))
+       (map (partial apply +))
+       (map (partial + 10))
+       (map (flip 100000))
+       (map #(do {:temp-value %}))
+       (map :temp-value)
+       (map (flip 100000))
+       (filter even?)
+       (apply +)
+       time)
+
+  (time @(spawn (+ 1 @(spawn (+ 2 3)))))
+
+  (time @(future (+ 1 @(future (+ 2 3)))))
+
+  (time @(future (+ 2 3)))
+
+  (time @(in :core (+ 2 3)))
 
   :end)
-  
-
-
-;; (println :in mesh/id :conf @inmesh.state/conf)
-
-;; (println :hi if)
-
-;; (comment
-
-  
-;;   (def db (spawn {:id :db1}))
-;;   (println :db db)
-;;   (println :in mesh/id :peers (keys @state/peers))
-;;   (in db (println :in mesh/id :peers (keys @state/peers)))
-;;   (println :res @(future (println :in-future) 2))
-;;   (println :=>> (=>> [1 2 3]
-;;                      (map inc)
-;;                      (map dec)
-;;                      (map inc)))
-;;   (in :core (println :in :core))
-;;   (in :core
-;;       (println :=>> (=>> [1 2 3]
-;;                          (map inc)
-;;                          (map dec)
-;;                          (map inc))))
-;;   (println :res (wait :core (println :in-core) (+ 1 2)))
-
-
-;;   :end)
-  

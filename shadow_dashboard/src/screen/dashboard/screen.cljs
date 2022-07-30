@@ -3,21 +3,29 @@
    [reagent.dom :as rdom]
    [comp.el :as c]
    [inmesh.core :as mesh]
-   [inmesh.state :as state]
-   [inmesh.re-frame :as rf :refer [dispatch subscribe]]
+   [inmesh.re-frame :refer [subscribe]]
    [dashboard.routes :as routes]
    [dashboard.shell :as shell]))
 
 ;;; Config
 (enable-console-print!)
-
-
+; for docs release
+;; #_
+(mesh/init!
+ {:sw-connect-string "/inmesh/sw.js"
+  :repl-connect-string "/inmesh/repl.js"
+  :core-connect-string "/inmesh/core.js"
+  :future true
+  :injest true
+  :injest-count 4 #_(u/num-cores)})
+#_
 (mesh/init!
  {:sw-connect-string "/sw.js"
   :repl-connect-string "/repl.js"
   :core-connect-string "/core.js"
   :future true
-  :injest true})
+  :injest true
+  :injest-count 4 #_(u/num-cores)})
 
 (def debug?
   ^boolean goog.DEBUG)
@@ -36,7 +44,7 @@
 ;; Views
 
 (defn main-shell [{:keys [router]}]
-  (let [dark-theme? @(rf/subscribe [:dark-theme?])]
+  (let [dark-theme? @(subscribe [:dark-theme?])]
     [:<>
      [c/css-baseline]
      [c/theme-provider (c/create-theme (custom-theme dark-theme?))

@@ -1,49 +1,53 @@
 (ns inmesh.idb
   (:require
    [clojure.edn :as edn]
-   [inmesh.state :as s]))
+   [inmesh.env :as e]
+   [inmesh.state :as s]
+   [inmesh.on-when :refer [on-when]]))
 
 (def idb-key "inmesh.db")
 
-(defn ^:export idb-open [& [yield]]
-  (let [yield (or yield identity)
-        req (.open js/indexedDB idb-key 1)
-        use-fallback #(reset! s/idb :use-fallback-db)
-        get-result #(-> % .-target .-result)]
-    (set! (.-onerror req) #(do (use-fallback) (yield false)))
-    (set! (.-onsuccess req) #(do (reset! s/idb (get-result %)) (yield true)))
-    (set! (.-onupgradeneeded req) #(let [adb (get-result %)]
-                                     (reset! s/idb adb)
-                                     (set! (.. % -target -transaction -onerror) use-fallback)
-                                     (.createObjectStore adb idb-key)
-                                     (yield true)))))
+(def open? (atom false))
 
 (defn ^:export idb-set! [k data & [yield]]
-  (let [adb @s/idb]
-    (if (= adb :use-fallback-db)
-      (do (swap! s/fallback-db assoc k data)
-          (when yield (yield true)))
-      (let [req (some-> adb
-                        (.transaction #js [idb-key] "readwrite")
-                        (.objectStore idb-key)
-                        (.put (pr-str data) (pr-str k)))]
-        (when req
-          (set! (.-onerror req) #(do (when yield (yield false))
-                                     (throw (ex-info (str "idb-set! failed setting " k " to " data)
-                                                     {:k k :data data :error %}))))
-          (set! (.-oncomplete req) #(when yield (yield true))))))))
+  (on-when @open?
+    (let [adb @s/idb
+          transaction (.transaction adb #js [idb-key] "readwrite")
+          os (.objectStore transaction idb-key)
+          req (.put os (pr-str data) (pr-str k))]
+      (set! (.-onerror req) #(println :idb-set! :error)) 
+      (set! (.-onsuccess req) #(let [res (some-> % .-target .-result)]
+                                 (yield res)))
+      (set! (.-oncomplete req) #(println :set :complete!)))))
 
 (defn ^:export idb-get [k yield]
-  (let [adb @s/idb]
-    (if (= adb :use-fallback-db)
-      (yield (get @s/fallback-db k))
-      (let [req (some-> adb
-                        (.transaction #js [idb-key])
-                        (.objectStore idb-key)
-                        (.get (pr-str k)))]
-        (when req
-          (set! (.-onerror req) #(do (yield nil)
-                                     (throw (ex-info (str "idb-get failed getting " k)
-                                                     {:k k :error %}))))
-          (set! (.-onsuccess req) #(let [res (-> % .-target .-result edn/read-string)]
-                                     (yield res))))))))
+  (on-when @open?
+    (let [adb @s/idb
+          req (-> adb
+                  (.transaction #js [idb-key])
+                  (.objectStore idb-key)
+                  (.get (pr-str k)))]
+      (when req
+        (set! (.-onerror req) #(do (yield nil)
+                                   (throw (ex-info (str "idb-get failed getting " k)
+                                                   {:k k :error %}))))
+        (set! (.-onsuccess req) #(let [res (-> % .-target .-result edn/read-string)]
+                                   (yield {:res res})))))))
+
+(when (= :db (:id e/data))
+  (let [request (.open js/indexedDB idb-key 1)]
+    (set! (.-onerror request) #(do (println :idb-open-error %)))
+    (set! (.-onsuccess request)
+          #(do (reset! s/idb (-> % .-target .-result))
+               (reset! open? true)))
+    (set! (.-onupgradeneeded request)
+          #(let [db (-> % .-target .-result)
+                 os (.createObjectStore db idb-key)]
+             (reset! s/idb db)
+             (set! (-> os .-transaction .-oncomplete)
+                   (fn [e]
+                      (let [init-os
+                            (-> db
+                                (.transaction idb-key "readwrite")
+                                (.objectStore idb-key))]
+                        (reset! open? true))))))))

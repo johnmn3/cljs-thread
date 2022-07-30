@@ -10,11 +10,18 @@
 
 (defmulti dispatch :dispatch)
 
+(defn read-id [id]
+  (if (.startsWith id ":")
+    (edn/read-string id)
+    (str id)))
+
 (defn message-handler [e]
   (let [data (.-data e)
         receive-port? (-> ^js data .-dispatch (= "receive-port"))
         data (if receive-port?
-               (-> data (js->clj :keywordize-keys true) (update :dispatch keyword) (update-in [:data :id] keyword))
+               (-> data (js->clj :keywordize-keys true)
+                   (update :dispatch keyword)
+                   (update-in [:data :id] read-id))
                (-> data edn/read-string))]
     (dispatch data)))
 
@@ -34,10 +41,9 @@
   (swap! s/peers assoc-in [id :port] port)
   (set! (.-onmessage port) message-handler))
 
-(defn- post [worker-id data & [transferables]]
-  (let [id (if (or (not (keyword? worker-id))
-                   (instance? IDable worker-id)
-                   (get-id worker-id))
+(defn post [worker-id data & [transferables]]
+  (let [id (if (and (not (keyword? worker-id))
+                    (instance? IDable worker-id))
              (get-id worker-id)
              worker-id)]
     (if (= :here id)
@@ -48,7 +54,7 @@
           (let [w (or (-> @s/peers (get-in [:parent :port]))
                       (-> @s/peers (get-in [:parent :w])))]
             (.postMessage w
-                          ((if (-> data :dispatch (= :receive-port)) clj->js str)
+                          ((if (-> data :dispatch (= :receive-port)) clj->js pr-str)
                            {:dispatch :proxy
                             :data data})
                           (if transferables
@@ -78,17 +84,17 @@
 (defn send-port [id c1]
   (post id {:dispatch :receive-port
             :data {:port c1
-                   :id (:id e/data)}}
+                   :id (str (:id e/data))}}
         [c1]))
 
 (defn dist-port [id1 id2 c1 c2]
   (post id1 {:dispatch :receive-port
              :data {:port c1
-                    :id id2}}
+                    :id (str id2)}}
         [c1])
   (post id2 {:dispatch :receive-port
              :data {:port c2
-                    :id id1}}
+                    :id (str id1)}}
         [c2]))
 
 (defn add-port [id p]

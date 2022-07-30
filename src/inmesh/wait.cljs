@@ -1,14 +1,13 @@
 (ns inmesh.wait
   (:require-macros
-   [inmesh.wait :refer [wait]]
+   [inmesh.wait]
    [inmesh.in :refer [in]])
   (:require
    [inmesh.util :as u]
-   [inmesh.env :as e]
-   [inmesh.state :as s]
    [inmesh.in]
    [inmesh.sync :as sync]))
 
+;; this is no longer needed - `in` can now yield and do the smae things - to be removed
 (defn do-wait [id args afn opts]
   (let [fut-id (u/gen-id)]
     (in id
