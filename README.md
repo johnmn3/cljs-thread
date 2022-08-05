@@ -292,7 +292,7 @@ So in Chrome and Safari, you can roughly double your speed and in Firefox you ca
 
 ## Stepping debugger
 
-The blocking semantics that `inmesh` provides opens up the doors to a lot of things that weren't possible in Clojurescript/Javascript and the browser in general. One of these things is a stepping debugger in the runtime (outside of the JS console debugger). `inmesh` ships with a simple example a stepping debugger:
+The blocking semantics that `inmesh` provides open up the doors to a lot of things that weren't possible in Clojurescript/Javascript and the browser in general. One of these things is a stepping debugger in the runtime (outside of the JS console debugger). `inmesh` ships with a simple example of a stepping debugger:
 ```clojure
 (dbg
  (let [x 1 y 3 z 5]
@@ -308,7 +308,7 @@ The blocking semantics that `inmesh` provides opens up the doors to a lot of thi
 ;:i 2
 ;=> :starting-dbg
 ```
-`dbg` is a convenience macro for shipping a form to a `:repl-sync` node that is constantly listening for new forms to evaluate for the purpose of debugging. `break` stops the execution from running further than a particular location in the code. It takes an optional form that defines _when_ the `break` should actually stop execution. Upon entering the break, the debugger enters a sub-loop, waiting for forms that can inspect the local variables in the context of the `break`.
+`dbg` is a convenience macro for sending a form to a debug worker that is constantly listening for new forms to evaluate for the purpose of debugging. `break` stops the execution from running beyond a particular location in the code. It also takes an optional form that defines _when_ the `break` should stop the execution. Upon entering the break, the debugger enters a sub-loop, waiting for forms which can inspect the local variables of the form in the context of the `break`.
 
 The `in?` macro allows you to send forms to the `break` context within the debugger:
 ```clojure
@@ -323,12 +323,12 @@ The `in?` macro allows you to send forms to the `break` context within the debug
 (in? a)
 ;=> nil
 ```
-For forms that have symbols other than those available in the locally bound variables of the remote form, you must declare in an explicit conveyance vector containing which symbols should be referenced:
+For forms that have symbols that are not locally bound variables in the remote form, you must declare an explicit conveyance vector containing the variables that should be referenced:
 ```clojure
 (in? [x i] (+ x i))
 ;=> 4
 ```
-The `in?` macro cannot know ahead of time that the form in the `dbg` instance hasn't locally re-bound the `+` symbol, and it hasn't in the above example. Therefore, for non-simple forms, the conveyance vector is necessary to disambiguate which symbols require resolving in the local context of the remote form and which don't.
+The `in?` macro above cannot know ahead of time that the form in the `dbg` instance hasn't locally re-bound the `+` symbol. Therefore, for non-simple forms, the conveyance vector is necessary to disambiguate which symbols require resolving in the local context of the remote form and which don't.
 
 By evaluating `:in/exit`, the running break context exits and the execution procedes to either the next break or until completion.
 ```clojure
