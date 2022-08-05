@@ -1,5 +1,7 @@
 (ns inmesh.core
-  (:refer-clojure :exclude [future]))
+  (:refer-clojure :exclude [future])
+  (:require
+   [injest.path]))
 
 (defmacro in [& x]
   `(inmesh.in/in ~@x))
@@ -20,6 +22,14 @@
   [& x]
   `(inmesh.injest/=>> ~@x))
 
-(defmacro on-when
-  [& x]
+(defmacro on-when [& x]
   `(inmesh.on-when/on-when ~@x))
+
+(defmacro dbg [& x]
+  `(inmesh.repl/dbg ~@x))
+
+(defmacro break [& x]
+  `(inmesh.repl/break ~@x))
+
+(defmacro in? [& x]
+  `(inmesh.repl/in? ~@x))

@@ -20,9 +20,9 @@
                     {:conf @s/conf
                      :env e/data}))))
 
-(defn request [getter & [resolve reject]]
+(defn request [getter & {:as opts :keys [resolve reject no-park max-time duration]}]
   (throw-if-non-blocking)
-  (let [req {:request-id getter :requester (:id e/data)}
+  (let [req {:request-id getter :requester (:id e/data) :no-park no-park :max-time max-time :duration duration}
         do-request (fn []
                      (try
                        (let [xhr (js/XMLHttpRequest.)]
@@ -49,7 +49,7 @@
   (try
     (let [req (if db?
                 {:responder (:id e/data) :db? db?}
-                {:payload payload :responder (:id e/data)})
+                {:responder (:id e/data)})
           xhr (js/XMLHttpRequest.)]
       (.open xhr "POST" (str "/intercept/response/key.js" (u/encode-qp req)))
       (.setRequestHeader xhr "Content-Type" "text/plain;charset=UTF-8")
@@ -81,7 +81,7 @@
           p (if-not promise?
               id
               (-> (js/Promise. (if (not delay?)
-                                 #(request id %1 %2)
+                                 #(request id {:resolve %1 :reject %2})
                                  #(do id)))
                   (.then (fn [result]
                            (reset! resolved? true)

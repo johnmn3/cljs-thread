@@ -6,19 +6,15 @@
    [inmesh.on-when :refer [on-when]]
    [inmesh.future :as f]
    [inmesh.injest :as i]
-   [inmesh.util :as u]))
-
-(defn start-repl [configs]
-  (when (and goog/DEBUG (:repl-connect-string configs))
-    (spawn {:id :repl :opts {:no-res? true}}
-           (s/update-conf! configs))))
+   [inmesh.util :as u]
+   [inmesh.repl :as repl]))
 
 (defn after-db [config]
   (spawn {:id :core :opts {:no-res? true}}
          (s/update-conf! config)
          (on-when (contains? @s/peers :db)
                   (reset! s/ready? true)))
-  (start-repl config))
+  (repl/start-repl config))
 
 (defn ^:export init-root! [& [config-map]]
   (assert (e/in-root?))

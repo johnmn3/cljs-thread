@@ -14,7 +14,8 @@ The `in` macro then abstracts over the message passing infrastructure, allowing 
 Place the following in the `:deps` map of your `deps.edn` file:
 ```
 ...
-net.clojars.john/inmesh {:mvn/version "0.1.0-alpha.1"}
+johnmn3/inmesh {:git/url "https://github.com/johnmn3/inmesh.git"
+                :sha     "8dc9f904d2328cbe62230044d299f71734df0168"}
 ...
 ```
 ### Build Tools
@@ -282,6 +283,59 @@ So in Chrome and Safari, you can roughly double your speed and in Firefox you ca
 `=>>` does not yet have binding conveyance (you just have to send the values down the pipeline) but it does return a promise on the main thread. By changing only one character, we can double or triple our performance, all while leaving the main thread free to render at 60 frames per second. Notice also how it's lazy :)
 
 > Note: on the main/screen thread, `=>>` returns a promise. `=>>` defaults to a chunk size of 512. We'll probably add a `pmap` in the future that has a chunk size of 1, for fanning side-effecting functions if you want. PRs welcome!
+
+## Stepping debugger
+
+The blocking semantics that `inmesh` provides opens up the doors to a lot of things that weren't possible in Clojurescript/Javascript and the browser in general. One of these things is a stepping debugger in the runtime (outside of the JS console debugger). `inmesh` ships with a simple example a stepping debugger:
+```clojure
+(dbg
+ (let [x 1 y 3 z 5]
+   (println :starting)
+   (dotimes [i z]
+     (break (= i y))
+     (println :i i))
+   (println :done)
+   x))
+;:starting
+;:i 0
+;:i 1
+;:i 2
+;=> :starting-dbg
+```
+`dbg` is a convenience macro for shipping a form to a `:repl-sync` node that is constantly listening for new forms to evaluate for the purpose of debugging. `break` stops the execution from running further than a particular location in the code. It takes an optional form that defines _when_ the `break` should actually stop execution. Upon entering the break, the debugger enters a sub-loop, waiting for forms that can inspect the local variables in the context of the `break`.
+
+The `in?` macro allows you to send forms to the `break` context within the debugger:
+```clojure
+(in? z)
+;=> 5
+(in? i)
+;=> 3
+(in? [i x y z])
+;=> [3 1 3 5]
+(in? [z y x])
+;=> [5 3 1]
+(in? a)
+;=> nil
+```
+For forms that have symbols other than those available in the locally bound variables of the remote form, you must declare in an explicit conveyance vector containing which symbols should be referenced:
+```clojure
+(in? [x i] (+ x i))
+;=> 4
+```
+The `in?` macro cannot know ahead of time that the form in the `dbg` instance hasn't locally re-bound the `+` symbol, and it hasn't in the above example. Therefore, for non-simple forms, the conveyance vector is necessary to disambiguate which symbols require resolving in the local context of the remote form and which don't.
+
+By evaluating `:in/exit`, the running break context exits and the execution procedes to either the next break or until completion.
+```clojure
+(in? :in/exit)
+;:i 3
+;:i 4
+;:done
+;=> 1
+```
+
+This is just a rudimentary implementation of a stepping debugger. It would be nice to implement a sub-repl that wrapped repl evaluations in the `in?` macro until exit. It would also be nice to implement an nrepl middle where for the same thing, transparently filling in the missing bits for cider's debugging middleware, such that editors like emacs and calva can automatically use their debugging workflows in a Clojurescript context. There's [a github issue for this feature](https://github.com/clojure-emacs/cider/issues/1416) in the cider repo and it would be nice to finally be able to unlock this capability for browser development. PRs welcome!
+
+> Note: There are a host of other use cases that weren't previously possible that become possible with blocking semantics. Another example might be porting Datascript to IndexedDB using a synchronous set/get interface. If there are any other possibilities that come to mind - things you've always wanted to be able to do but weren't able to due to the lack of blocking semantics in the browser - feel free to drop a request in the issues and we can explore it.
 
 ## Some history
 

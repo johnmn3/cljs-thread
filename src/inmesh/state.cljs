@@ -21,6 +21,9 @@
 (def responses
   (atom {}))
 
+(def requests
+  (atom {}))
+
 (def future-pool (atom {:available #{} :in-use #{}}))
 
 (def idb (atom nil))

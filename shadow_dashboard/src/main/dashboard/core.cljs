@@ -6,7 +6,7 @@
    [dashboard.regs.shell]
    [dashboard.regs.sign-in]
    [inmesh.env :as env]
-   [inmesh.core :as mesh :refer [future spawn in =>>]]))
+   [inmesh.core :as mesh :refer [future spawn in =>> dbg break in?]]))
 
 (enable-console-print!)
 
@@ -63,6 +63,39 @@
                 time))))
 
 (comment
+  (println :hi)
+
+  (dbg
+   (let [x 1 y 3 z 5]
+     (println :starting)
+     (dotimes [i z]
+       (break (= i y))
+       (println :i i))
+     (println :done)
+     4))
+  ;:starting
+  ;:i 0
+  ;:i 1
+  ;:i 2
+  ;=> :starting-dbg
+
+  (in? [x i] (+ x i))
+  ;=> 4
+  (in? z)
+  ;=> 5
+  (in? i)
+  ;=> 3
+  (in? [i x y z])
+  ;=> [3 1 3 5]
+  (in? [z y x])
+  ;=> [5 3 1]
+  (in? a)
+  ;=> nil
+  (in? :in/exit)
+  ;:i 3
+  ;:i 4
+  ;:done
+  ;=> 4
 
   (def s1 (spawn))
 
@@ -117,10 +150,6 @@
        :iss_position
        (println "ISS Position:"))
 
-  (defn post [url headers data]
-    (let [response-post @(future (-> got (.post url (clj->js {:headers headers :json data})) .json yield))]
-      (println (js->clj response-post :keywordize-keys true))))
-
   @(spawn (js/setTimeout
            #(yield (println :finally!) (+ 1 2 3))
            5000))
@@ -133,30 +162,18 @@
                       (.then #(yield (js->clj % :keywordize-keys true)))))
           (.then #(println "ISS Position:" (:iss_position %)))))
 
-  (=>> (range)
-       (map (flip 100000))
-       (filter even?)
-       (map (flip 100000))
-       (filter odd?)
-       (map (flip 100000))
-       (filter even?)
-       (map (flip 100000))
-       (take 1000)
-       (apply +)
-       time)
-
-  (->> (range 1000)
+  (=>> (range 10000)
        (map inc)
        (filter odd?)
-       (map (flip 100000))
+       (map (flip 1000))
        (mapcat #(do [% (dec %)]))
        (partition-by #(= 0 (mod % 5)))
        (map (partial apply +))
        (map (partial + 10))
-       (map (flip 100000))
+       (map (flip 1000))
        (map #(do {:temp-value %}))
        (map :temp-value)
-       (map (flip 100000))
+       (map (flip 1000))
        (filter even?)
        (apply +)
        time)
@@ -188,6 +205,9 @@
        time)
 
   (time @(spawn (+ 1 @(spawn (+ 2 3)))))
+
+  (let [x 2]
+    @(future (+ 1 @(future (+ x 3)))))
 
   (time @(future (+ 1 @(future (+ 2 3)))))
 

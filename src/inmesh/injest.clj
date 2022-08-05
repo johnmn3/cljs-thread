@@ -1,4 +1,6 @@
-(ns inmesh.injest)
+(ns inmesh.injest
+  (:require
+   [injest.impl]))
 
 (defmacro tfan [xf-group]
   (let [tfn `(fn [] (injest.impl/compose-transducer-group ~xf-group))]

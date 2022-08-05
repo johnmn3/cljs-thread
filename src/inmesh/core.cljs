@@ -1,5 +1,5 @@
 (ns inmesh.core
-  (:require-macros [inmesh.core :refer [spawn]])
+  (:require-macros [inmesh.core :refer [on-when spawn in]])
   (:require
    [inmesh.util :as u]
    [inmesh.env :as e]
@@ -10,12 +10,23 @@
    [inmesh.wait]
    [inmesh.root :as r]
    [inmesh.db]
+   [inmesh.repl]
    [inmesh.future]
    [inmesh.injest]))
 
 (enable-console-print!)
 
 (def ^:export id (:id e/data))
+
+(when-not (e/in-core?)
+  (on-when (contains? @s/peers :core)
+    (reset! s/ready? true)))
+
+(when-not (or (e/in-screen?) (e/in-sw?) (= :repl id))
+  (set-print-fn! #(in :repl {:no-res? true}
+                      (print %)))
+  (set-print-err-fn! #(in :repl {:no-res? true}
+                          (print %))))
 
 (defn init! [& [config-map]]
   (assert (e/in-screen?))
@@ -42,7 +53,4 @@
                       :opts {:request-id (:id e/data) :atom? true :yield? (:yield? e/data)}}}))
   (when (and (not (:yield? e/data)) (not (:deamon? e/data)))
     (.close js/self))
-  :end)
-
-(when (e/in-core?)
   :end)

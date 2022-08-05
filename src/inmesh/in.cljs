@@ -12,7 +12,7 @@
 
 (defn do-call
   [{:keys [data] :as outer-data}]
-  (let [{:keys [sfn sargs opts in-id]} data
+  (let [{:keys [sfn sargs opts in-id local?]} data
         res (try
               (if-not sargs
                 (if (and in-id (:yield? opts))
@@ -35,8 +35,10 @@
                   (sync/send-response {:request-id (:request-id opts) :response {:error (pr-str e)}}))))]
     (when (:atom? opts)
       (reset! s/local-val res))
-    (when (and (not (:yield? opts)) (not (:no-res? opts)) (not (e/in-sw?)))
-      (sync/send-response {:request-id (:request-id opts) :response res}))))
+    (if local?
+      res
+      (when (and (not (:yield? opts)) (not (:no-res? opts)) (not (e/in-sw?)))
+        (sync/send-response {:request-id (:request-id opts) :response res})))))
 
 
 (defmethod m/dispatch :call

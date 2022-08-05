@@ -10,7 +10,7 @@
 ;;; Config
 (enable-console-print!)
 ; for docs release
-;; #_
+#_
 (mesh/init!
  {:sw-connect-string "/inmesh/sw.js"
   :repl-connect-string "/inmesh/repl.js"
@@ -18,7 +18,7 @@
   :future true
   :injest true
   :injest-count 4 #_(u/num-cores)})
-#_
+;; #_
 (mesh/init!
  {:sw-connect-string "/sw.js"
   :repl-connect-string "/repl.js"

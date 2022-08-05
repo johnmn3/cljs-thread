@@ -1,5 +1,14 @@
 (ns inmesh.macro-impl)
 
+
+(defn get-symbols [body]
+  (->> body
+       (tree-seq coll? seq)
+       (rest)
+       (filter (complement coll?))
+       (filter symbol?)
+       vec))
+
 (defn get-locals [env body]
   (->> (filter (complement coll?)
                (rest (tree-seq coll? seq body)))
