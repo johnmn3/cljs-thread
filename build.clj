@@ -3,7 +3,7 @@
   (:require [org.corfield.build :as bb]))
 
 (def lib 'net.clojars.john/inmesh)
-(def version "0.1.0-alpha.2")
+(def version "0.1.0-alpha.3")
 
 ;; clojure -T:build ci
 ;; clojure -T:build deploy
