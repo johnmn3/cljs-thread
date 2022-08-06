@@ -110,17 +110,19 @@ _Ephemeral deref_:
 ```
 In workers, `spawn` returns a derefable, which returns the body's return value. In the main/screen thread, it returns a promise:
 ```clojure
-(-> (spawn (+ 1 2 3))
+(-> @(spawn (+ 1 2 3))
     (.then #(println :ephemeral :result %)))
 ;:ephemeral :result 6
 ```
+> Note: The deref (`@(spawn...`) forces the result to be resolved for `.then`ing. Choosing not to deref on the main thread, as with on workers, implies the evaluation is side effecting and that we don't care about returning the result.
+
 In a worker, you can force the return of a promise with `(spawn {:promise? true} (+ 1 2 3))` if you'd rather treat it like a promise:
 ```clojure
-(-> (js/Promise.all #js [(spawn {:promise? true} 1) (spawn {:promise? true} 2)])
-      (.then #(println :res (js->clj %))))
+(-> @(js/Promise.all #js [(spawn {:promise? true} 1) (spawn {:promise? true} 2)])
+    (.then #(println :res (js->clj %))))
 ;:res [1 2]
 ```
-`spawn` has more features, but they mostly match the features of `in` and `future`. `spawn` has a startup cost that we don't want to have to pay all the time, so you should use it sparingly.
+`spawn` has more features, but they mostly match the features of `in` and `future` which we'll go over below. `spawn` has a startup cost that we don't want to have to pay all the time, so you should use it sparingly.
 ## `in`
 Now that we have some workers, let's do some stuff `in` them:
 ```clojure
@@ -131,61 +133,61 @@ We can also make chains of execution across multiple workers:
 ```clojure
 (in s1
     (println :now :we're :in :s1)
-    (in :s2
+    (in s2
         (println :now :we're :in :s2 :through :s1)))
 ;:now :we're :in :s1
 ;:now :we're :in :s2 :through :s1
 ```
-Notice how we had to call `s2` by it's id there - `s1` does not know about the var of `s2`, but it does have `:s2` in it's local registry. We can pass pass the `s2` var into `s1` via a _conveyance vector_, which we'll go over below.
-
 You can also deref the return value of `in`:
 ```clojure
-@(in s1 (+ 1 @(in :s2 (+ 2 3))))
+@(in s1 (+ 1 @(in s2 (+ 2 3))))
 ;=> 6
 ```
-### Local binding conveyance
-For most functions, `inmesh` will try to automatically convey local bindings across workers:
+### Binding conveyance
+For most functions, `inmesh` will try to automatically convey local bindings, as well as vars local to the invoking namespace, across workers:
 ```clojure
 (let [x 3] 
-    @(in s1 (+ 1 @(in :s2 (+ 2 x)))))
+    @(in s1 (+ 1 @(in s2 (+ 2 x)))))
 ;=> 6
 ```
-That only works for variables bound to the local scope of the form, not in the top level of the namespace in which the form exists. This will not work:
+That only works for symbols bound to the local scope of the form or top level defs of the current namespace. Therefore, this will not work:
 ```clojure
 (def x 3)
-@(in s1 (+ 1 @(in :s2 (+ 2 x))))
+@(in s1 (+ 1 @(in s2 (+ 2 x))))
 ```
-We may try to get fancier in the future and allow you to do that for some things, but that'll require some more advanced macrology. We certainly don't want to unintentionally send too much _"over the wire"_ to other workers, as it's not free.
+Some things however cannot be transmitted. This will not work:
+```clojure
+(def y (atom 3))
+@(in s1 (+ 1 @(in s2 (+ 2 @y))))
+```
+Atoms cannot be serialized. If you want to reference an atom that lives on the remote worker, you can either:
+- Define it in another namespace (it's not a bad idea to define stateful things in a special namespace anyway); or
+- Declare the invocation with `:no-globals?` like `@(in s1 {:no-globals? true} (+ 1 @(in s2 (+ 2 @y))))`. This way, you can have `y` defined in the same namespace on both ends of the invocation but you'll be explicitly referencing the one on the remote side.
 
-You can, however, explicity define a _conveyance vector_:
+You can also explicity define a _conveyance vector_:
 ```clojure
 @(in s1 [x] (+ 1 @(in s2 (+ 2 x))))
 ;=> 6
 ```
-Here, `[x]` declares that we want to pass `x` through to `:s2`. We don't need to declare it again in `s2` because now it is implicitly conveyed, as it is in the local scope of the form.
+Here, `[x]` declares that we want to pass `x` (here defined as `3`) through to `s2`. We don't need to declare it again in `s2` because now it is implicitly conveyed as it is in the local scope of the form.
 
-Now we can also pass a reference to `s2` along and invoke `in` it:
-```clojure
-@(in s1 [x s2] (+ 1 @(in s2 (+ 2 x))))
-;=> 6
-```
 However, you can't currently mix both implicit and explicit binding conveyance:
 ```clojure
-(let [y 3]
-  @(in s1 [x s2] (+ 1 @(in s2 (+ x y)))))
+(let [z 3]
+  @(in s1 [x] (+ 1 @(in s2 (+ x z)))))
 ;=> nil
 ```
 Rather, this would work:
 ```clojure
-(let [y 3]
-  @(in s1 [x y s2] (+ 1 @(in s2 (+ x y)))))
+(let [z 3]
+  @(in s1 [x y] (+ 1 @(in s2 (+ x z)))))
 ;=> 7
 ```
 The explicit conveyance vector is essentially your escape hatch, for when the simple implicit conveyance isn't enough.
 > Note: binding conveyance and `yield` also work with `spawn`
 > ```clojure
 > (let [x 6]
->   @(spawn (yield (+ x 2)) (println :i'm :ephemeral :in mesh/id)))
+>   @(spawn (yield (+ x 2)) (println :i'm :ephemeral)))
 > ;:i'm :ephemeral
 > ;=> 8
 >```
@@ -194,7 +196,7 @@ The explicit conveyance vector is essentially your escape hatch, for when the si
 > @(spawn (+ 1 @(spawn (+ 2 3))))
 > ;=> 6
 >```
-> But that will take 10 to 100 times longer, due to worker startup delay, so make sure that your work is truly heavy and ephemeral. With re-frame, react and a few other megabytes of dev-time dependencies loaded in `/core.js`, that call took me about 1 second to complete - very slow.
+> But that will take 10 to 100 times longer, due to worker startup delay, so make sure that your work is truly heavy and ephemeral. With re-frame, react and a few other megabytes of dev-time dependencies loaded in `/core.js`, that call took me about 1 second to complete - not very fast.
 ### `yield`
 
 When you want to convert an async javascript function into a synchronous one, `yield` is especially useful:
@@ -216,15 +218,6 @@ When you want to convert an async javascript function into a synchronous one, `y
 >```
 > Where `6` took 5 seconds to return - handy for async tasks in ephemeral workers.
 
-```clojure
-(->> @(future (-> (js/fetch "http://api.open-notify.org/iss-now.json")
-                  (.then #(.json %))
-                  (.then #(yield (js->clj % :keywordize-keys true)))))
-     :iss_position
-     (println "ISS Position:"))
-;ISS Position: {:latitude 44.4403, :longitude 177.0011}
-```
-
 ## `future`
 You don't have to create new workers though. `inmesh` comes with a thread pool of workers which you can invoke `future` on. Once invoked, it will grab one of the available workers, do the work on it and then free it when it's done.
 ```clojure
@@ -234,19 +227,17 @@ You don't have to create new workers though. `inmesh` comes with a thread pool o
 ```
 That took about 20 milliseconds.
 
-> Note: A single synchronous `future` call will cost you around 8 to 10 milliseconds. A single synchronous `in` call will cost you around 4 to 5 milliseconds, depending on if it needs to be proxied. Some optimizations in the future will hopefully bring that more reliably down to around 1 millisecond for most `in` calls.
+> Note: A single synchronous `future` call will cost you around 8 to 10 milliseconds. A single synchronous `in` call will cost you around 4 to 5 milliseconds, depending on if it needs to be proxied.
 
 Again, all of these constructs return promises on the main/screen thread:
 ```clojure
-(-> (future (-> (js/fetch "http://api.open-notify.org/iss-now.json")
-                (.then #(.json %))
-                (.then #(yield (js->clj % :keywordize-keys true)))))
+(-> @(future (-> (js/fetch "http://api.open-notify.org/iss-now.json")
+                 (.then #(.json %))
+                 (.then #(yield (js->clj % :keywordize-keys true)))))
     (.then #(println "ISS Position:" (:iss_position %))))
 ;ISS Position: {:latitude 45.3612, :longitude -110.6497}
 ```
 You wouldn't want to do this for such a lite-weight api call, but if you have some large payloads that you need fetched and normalized, it can be convenient to run them in futures for handling off the main thread.
-
-The same locals conveyance features work with `future` as do with `spawn` and `in`.
 
 `inmesh`'s blocking semantics are great for achieving synchronous control flow when you need it, but as shown above, it has a performance cost of having to wait on the service worker to proxy results. Therefore, you wouldn't want to use them in very hot loops or for implementing tight algorithms. We can beat single threaded performance though if we're smart about chunking work up into large pieces and fanning it across a pool of workers. You can design your own system for doing that, but `inmesh` comes with a solution for pure functions: `=>>`.
 
@@ -286,9 +277,9 @@ On Chrome, that'll take only about 8 to 10 seconds. On Safari it takes about 30 
 
 So in Chrome and Safari, you can roughly double your speed and in Firefox you can go three or more times faster.
 
-`=>>` does not yet have binding conveyance (you just have to send the values down the pipeline) but it does return a promise on the main thread. By changing only one character, we can double or triple our performance, all while leaving the main thread free to render at 60 frames per second. Notice also how it's lazy :)
+`=>>` does not yet have binding conveyance (you just have to send the values down the pipeline). By changing only one character, we can double or triple our performance, all while leaving the main thread free to render at 60 frames per second. Notice also how it's lazy :)
 
-> Note: on the main/screen thread, `=>>` returns a promise. `=>>` defaults to a chunk size of 512. We'll probably add a `pmap` in the future that has a chunk size of 1, for fanning side-effecting functions if you want. PRs welcome!
+> Note: On the main/screen thread, `=>>` returns a promise. `=>>` defaults to a chunk size of 512. We'll probably add a `pmap` in the future that has a chunk size of 1, for fanning side-effecting functions if you want. PRs welcome!
 
 ## Stepping debugger
 
@@ -347,6 +338,6 @@ This is just a rudimentary implementation of a stepping debugger. It would be ni
 
 `in.mesh` is derived from [`tau.alpha`](https://github.com/johnmn3/tau.alpha) which I released about four years ago. That project evolved towards working with SharedArrayBuffers (SABs). A slightly update version of `tau.alpha` is available here: https://gitlab.com/johnmn3/tau and you can see a demo of the benefits of SABs here: https://simultaneous.netlify.app/
 
-At an early point during the development of `tau.alpha`, I got blocking semantics to work with synchronous XHRs and hacking the response from a sharedworker. I eventually abandoned that when I discovered you could get blocking semantics and better performance out of SABs and `js/Atomics`.
+At an early point during the development of `tau.alpha` about four years ago, I got blocking semantics to work with these synchronous XHRs and hacking the response from a sharedworker. I eventually abandoned this strategy when I discovered you could get blocking semantics and better performance out of SABs and `js/Atomics`.
 
-Unfortunately there was lot's of drama around the security of SABs and, years later, they require very constraining security settings, making their usage impractical for some deployment situations. You'll never get the same performance in `inmesh`, in terms of worker-to-worker communication - in `tau.alpha` you're literally using shared memory - but there's no reason these other features shouldn't be available in non-SAB scenarios, so I figured it would make sense to extract these other bits out into `inmesh` and build V2 of `tau.alpha` on top of it. With `tau.beta`, built on `inmesh`, I'll be implementing SAB-less variants of `atom`s and `agent`s, with similar semantics to that of Clojure's. Then I'll be implementing SAB-based versions that folks can opt in to if desired.
+Unfortunately there was lot's of drama around the security of SABs and, years later, they require very constraining security settings, making their usage impractical for some deployment situations. Compared to using typed arrays in `tau.alpha`, you'll never get that same performance in `inmesh`, in terms of worker-to-worker communication - in `tau.alpha` you're literally using shared memory - but there's no reason these other features shouldn't be available in non-SAB scenarios, so I figured it would make sense to extract these other bits out into `inmesh` and build V2 of `tau.alpha` on top of it. With `tau.beta`, built on `inmesh`, I'll be implementing SAB-less variants of `atom`s and `agent`s, with similar semantics to that of Clojure's. Then I'll be implementing SAB-based versions that folks can opt in to if desired.

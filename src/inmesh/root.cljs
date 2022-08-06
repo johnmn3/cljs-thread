@@ -25,8 +25,7 @@
       (f/start-futures config)
       (i/start-injests config)
       (if (u/in-safari?)
-        (do (spawn {:id :db :no-globals? true}
-                   (println :in-db :spawn-effect))
+        (do (spawn {:id :db :no-globals? true})
             (after-db config))
         (spawn {:id :db :no-globals? true}
                (after-db config))))))
