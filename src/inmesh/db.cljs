@@ -5,7 +5,7 @@
    [inmesh.idb :refer [idb-set! idb-get]]))
 
 (defn db-set! [k data]
-  (in :db {:no-res? true} (idb-set! k data identity))
+  (in :db (idb-set! k data identity))
   data)
 
 (defn db-get [k]

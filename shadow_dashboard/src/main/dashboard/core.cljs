@@ -6,6 +6,7 @@
    [dashboard.regs.shell]
    [dashboard.regs.sign-in]
    [inmesh.env :as env]
+   [inmesh.state :as s]
    [inmesh.core :as mesh :refer [future spawn in =>> dbg break in?]]))
 
 (enable-console-print!)
@@ -18,9 +19,9 @@
 (defn flip [n]
   (apply comp (take n (cycle [inc inc dec]))))
 
+;; uncomment for advanced compile tests
 #_
 (when (env/in-core?)
- ;(on-when @s/ready?
   (future 
 
     (->> @s/peers
@@ -106,7 +107,7 @@
   (println :ephemeral :result @(spawn (+ 1 2 3)))
 
   (in :screen
-      (-> (spawn (+ 1 2 3))
+      (-> @(spawn (println :working) (+ 1 2 3))
           (.then #(println :ephemeral :result %))))
 
   (-> (js/Promise.all #js [(spawn {:promise? true} 1)
@@ -115,26 +116,26 @@
 
   (in s1 (println :hi :from :s1))
 
-  (in s1 ;[s2]
+  (in s1
       (println ":now :we're :in :s1")
-      (in :s2
+      (in s2
           (println ":now :we're :in :s2 :through :s1")))
 
-  @(in s1 (+ 1 @(in :s2 (+ 2 3))))
+  @(in s1 (+ 1 @(in s2 (+ 2 3))))
 
   (let [x 3]
-    @(in s1 (+ 1 @(in :s2 (+ 2 x)))))
+    @(in s1 (+ 1 @(in s2 (+ 2 x)))))
 
   (def x 3)
-  @(in s1 (+ 1 @(in :s2 (+ 2 x)))) ; <- won't work
+  @(in s1 (+ 1 @(in s2 (+ 2 x))))
 
   (def x 3)
-  @(in s1 [x] (+ 1 @(in :s2 (+ 2 x))))
+  @(in s1 (+ 1 @(in s2 (+ 2 x))))
 
   @(in s1 [x s2] (+ 1 @(in s2 (+ 2 x))))
 
   (let [y 3]
-    @(in s1 [x s2] (+ 1 @(in s2 (+ x y))))) ; <- won't work
+    @(in s1 (+ 1 @(in s2 (+ x y)))))
 
   (let [y 3]
     @(in s1 [x y s2] (+ 1 @(in s2 (+ x y)))))
@@ -154,12 +155,18 @@
            #(yield (println :finally!) (+ 1 2 3))
            5000))
 
+  @(in :screen
+       (-> @(spawn (js/setTimeout
+                    #(yield (println :finally!) (+ 1 2 3))
+                    5000))
+           (.then #(yield %))))
+
   @(future (+ 1 @(future (+ 2 3))))
 
   (in :screen
-      (-> (future (-> (js/fetch "http://api.open-notify.org/iss-now.json")
-                      (.then #(.json %))
-                      (.then #(yield (js->clj % :keywordize-keys true)))))
+      (-> @(future (-> (js/fetch "http://api.open-notify.org/iss-now.json")
+                       (.then #(.json %))
+                       (.then #(yield (js->clj % :keywordize-keys true)))))
           (.then #(println "ISS Position:" (:iss_position %)))))
 
   (=>> (range 10000)

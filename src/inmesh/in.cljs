@@ -14,18 +14,20 @@
   [{:keys [data] :as outer-data}]
   (let [{:keys [sfn sargs opts in-id local?]} data
         res (try
-              (if-not sargs
-                (if (and in-id (:yield? opts))
-                  ((js/eval (str "(" sfn ")();")) in-id)
-                  (js/eval (str "(" sfn ")();")))
-                (apply (if (and in-id (:yield? opts))
-                         ((js/eval (str "(function () {return (" sfn ");})();")) in-id)
-                         (js/eval (str "(function () {return (" sfn ");})();")))
-                       (if (vector? sargs)
-                         (->> sargs (mapv #(if (and (string? %) (.startsWith % "#in/mesh"))
-                                             (js/eval (str "(function () {return (" (apply str (drop 9 %)) ");})();"))
-                                             %)))
-                         (js/eval (str "(" sargs ")();")))))
+              (if (or (nil? sfn) (= sfn "nil"))
+                nil
+                (if-not sargs
+                  (if (and in-id (:yield? opts))
+                    ((js/eval (str "(" sfn ")();")) in-id)
+                    (js/eval (str "(" sfn ")();")))
+                  (apply (if (and in-id (:yield? opts))
+                           ((js/eval (str "(function () {return (" sfn ");})();")) in-id)
+                           (js/eval (str "(function () {return (" sfn ");})();")))
+                         (if (vector? sargs)
+                           (->> sargs (mapv #(if (and (string? %) (.startsWith % "#in/mesh"))
+                                               (js/eval (str "(function () {return (" (apply str (drop 9 %)) ");})();"))
+                                               %)))
+                           (js/eval (str "(" sargs ")();"))))))
               (catch :default e
                 (println :error-in (:id e/data))
                 (println :error-in-do-call e)
@@ -37,7 +39,7 @@
       (reset! s/local-val res))
     (if local?
       res
-      (when (and (not (:yield? opts)) (not (:no-res? opts)) (not (e/in-sw?)))
+      (when (and (not (:yield? opts)) (not (e/in-sw?)))
         (sync/send-response {:request-id (:request-id opts) :response res})))))
 
 
@@ -69,5 +71,4 @@
         (post-in)
         (on-when (contains? @s/peers id)
           (post-in))))
-    (when (not (:no-res? opts))
-      (sync/wrap-derefable (merge opts {:id in-id})))))
+    (sync/wrap-derefable (merge opts {:id in-id}))))

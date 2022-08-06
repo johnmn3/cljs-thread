@@ -72,9 +72,7 @@
         (link id)
         (m/post id
                 {:dispatch :call
-                 :data (merge
-                        {:sfn (str (fn [])) :from (:id e/data) :to id}
-                        {:opts {:no-res? true}})})))
+                 :data {:sfn (str (fn [])) :from (:id e/data) :to id}})))
     id))
 
 (defn meshify [id]
@@ -126,4 +124,4 @@
         (if (and (e/in-screen?) (= id :root))
           (local-spawn data)
           (send-spawn :root data))))
-    (sync/wrap-derefable data {:delay? (if yield? true false)})))
+    (sync/wrap-derefable data)))
