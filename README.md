@@ -160,7 +160,7 @@ Some things however cannot be transmitted. This will not work:
 (def y (atom 3))
 @(in s1 (+ 1 @(in s2 (+ 2 @y))))
 ```
-Atoms cannot be serialized. If the current namespace is being shared between both sides of the invocation and you want to reference an atom that lives on the remote side, you can either:
+Atoms cannot be serialized. If the current namespace is being shared between both sides of the invocation and you want to reference an atom that lives on the remote side without conveying the local one, you can either:
 - Define it in another namespace, so the local version is not conveyed (it's not a bad idea to define stateful things in a special namespace anyway); or
 - Declare the invocation with `:no-globals?` like `@(in s1 {:no-globals? true} (+ 1 @(in s2 (+ 2 @y))))`. This way, you can have `y` defined in the same namespace on both ends of the invocation but you'll be explicitly referencing the one on the remote side.
 - Use an explicit conveyence vector that does not include the local symbol, like `@(in s1 [s2] (+ 1 @(in s2 (+ 2 @y))))`. Using explicit conveyance vectors disables implicit conveyance altogether.
