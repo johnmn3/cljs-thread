@@ -6,3 +6,9 @@
 /out
 .nrep-port
 target
+shadow_dashboard/node_modules
+shadow_dashboard/resources/public
+!shadow_dashboard/resources/public/index.html
+shadow_dashboard/.shadow-cljs
+.lsp/
+.portal
