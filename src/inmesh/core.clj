@@ -12,9 +12,6 @@
 (defmacro spawn [& x]
   `(inmesh.spawn/spawn ~@x))
 
-(defmacro wait [& x]
-  `(inmesh.wait/wait ~@x))
-
 (defmacro =>>
   "Just like x>> but first composes stateless transducers into a function that 
    transduces in parallel the values flowing through the thread. Remaining

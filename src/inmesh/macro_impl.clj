@@ -1,6 +1,5 @@
 (ns inmesh.macro-impl)
 
-
 (defn get-symbols [body]
   (->> body
        (tree-seq coll? seq)
@@ -18,6 +17,18 @@
        (filter (comp not nil?))
        vec
        (#(do [% %]))))
+
+(defn get-locals-and-globals [env body]
+  (let [defs-and-locals (merge (:locals env)
+                               (into {} (map (fn [[k v]] [k {:name k}]) (:defs (:ns env)))))]
+    (->> (filter (complement coll?)
+                 (rest (tree-seq coll? seq body)))
+         (filter symbol?)
+         (map defs-and-locals)
+         (map :name)
+         (filter (comp not nil?))
+         vec
+         (#(do [% %])))))
 
 (defn parse-in [x]
   (let [f (first x)
@@ -41,10 +52,13 @@
              (tree-seq coll? seq)
              (filter yield-form?))))))
 
-(defn locals-and-args [env body]
+(defn globals-locals-and-args [env body]
   (let [[args opts body*] (parse-in body)
+        no-globals? (:no-globals? opts)
         [conveyer names]
         (if (seq args)
           [(mapv symbol args) args]
-          (get-locals env body*))]
+          (if no-globals?
+            (get-locals env body*)
+            (get-locals-and-globals env body*)))]
     [conveyer names opts body*]))

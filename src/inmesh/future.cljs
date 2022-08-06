@@ -40,21 +40,19 @@
   (when (or (:future configs) (:future-count configs) (:future-connect-string configs))
     (let [future-ids (mk-worker-ids (:future-count configs 4))
           future-conf (assoc configs :future-ids future-ids)]
-      (spawn {:id :future :opts {:no-res? true}}
+      (spawn {:id :future :no-globals? true}
              (init-future! future-conf))
       (->> future-ids
            (mapv (fn [fid]
-                   (spawn {:id fid :opts {:no-res? true}}
+                   (spawn {:id fid :no-globals? true}
                           (s/update-conf! future-conf))))))))
 
 (defn do-future [args afn opts]
   (let [fut-id (u/gen-id)]
     (in :future
-        {:no-res? true}
         (on-when (-> @s/future-pool :available seq) {:duration 5}
           (let [worker (take-worker!)]
             (in worker
-                {:no-res? true}
                 (try
                   (if (seq args)
                     ((apply afn args)
@@ -64,6 +62,5 @@
                   (catch :default e
                     (sync/send-response {:request-id fut-id :response {:error (pr-str e)}})))
                 (in :future
-                    {:no-res? true}
                     (put-back-worker! worker))))))
     (sync/wrap-derefable (merge opts {:id fut-id}))))

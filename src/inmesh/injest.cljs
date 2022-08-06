@@ -16,11 +16,11 @@
 (defn start-injests [configs]
   (when (or (:injest configs) (:injest-count configs) (:injest-connect-string configs))
     (let [injests (-> configs (:injest-count 8) mk-injest-ids)]
-      (spawn {:id :injest :opts {:no-res? true}}
+      (spawn {:id :injest :no-globals? true}
              (s/update-conf! configs))
       (->> injests
            (mapv (fn [wid]
-                   (spawn {:id wid :opts {:no-res? true}}
+                   (spawn {:id wid :no-globals? true}
                           (s/update-conf! configs))))))))
 
 (def ^:dynamic *par* nil)

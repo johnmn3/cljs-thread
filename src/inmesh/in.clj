@@ -3,7 +3,7 @@
    [inmesh.macro-impl :as i]))
 
 (defmacro in [id & x]
-  (let [[conveyer names opts body] (i/locals-and-args &env x)
+  (let [[conveyer names opts body] (i/globals-locals-and-args &env x)
         yield? (i/yields? x)
         yfn (if-not yield?
               `(fn ~names ~@body)

@@ -10,7 +10,7 @@
    [inmesh.repl :as repl]))
 
 (defn after-db [config]
-  (spawn {:id :core :opts {:no-res? true}}
+  (spawn {:id :core}
          (s/update-conf! config)
          (on-when (contains? @s/peers :db)
                   (reset! s/ready? true)))
@@ -25,8 +25,8 @@
       (f/start-futures config)
       (i/start-injests config)
       (if (u/in-safari?)
-        (do (spawn {:id :db :opts {:no-res? true}}
+        (do (spawn {:id :db :no-globals? true}
                    (println :in-db :spawn-effect))
             (after-db config))
-        (spawn {:id :db :opts {:no-res? true}}
+        (spawn {:id :db :no-globals? true}
                (after-db config))))))

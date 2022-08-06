@@ -7,7 +7,6 @@
    [inmesh.spawn :as sp]
    [inmesh.on-when]
    [inmesh.in]
-   [inmesh.wait]
    [inmesh.root :as r]
    [inmesh.db]
    [inmesh.repl]
@@ -22,21 +21,15 @@
   (on-when (contains? @s/peers :core)
     (reset! s/ready? true)))
 
-(when-not (or (e/in-screen?) (e/in-sw?) (= :repl id))
-  (set-print-fn! #(in :repl {:no-res? true}
-                      (print %)))
-  (set-print-err-fn! #(in :repl {:no-res? true}
-                          (print %))))
-
 (defn init! [& [config-map]]
   (assert (e/in-screen?))
   (when config-map
     (swap! s/conf merge config-map))
   (let [config @s/conf]
     (if-not (:sw-connect-string config)
-      (spawn {:id :root :opts {:no-res? true}}
+      (spawn {:id :root :no-globals? true}
              (r/init-root! config))
-      (do (sp/spawn-sw #(spawn {:id :root :opts {:no-res? true}}
+      (do (sp/spawn-sw #(spawn {:id :root :no-globals? true}
                                (r/init-root! config)))
           (when-not (u/in-safari?)
             (sp/on-sw-registration-reload))))))

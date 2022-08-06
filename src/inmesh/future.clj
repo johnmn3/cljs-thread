@@ -4,7 +4,7 @@
    [inmesh.macro-impl :as i]))
 
 (defmacro future [& x]
-  (let [[conveyer names opts body] (i/locals-and-args &env x)
+  (let [[conveyer names opts body] (i/globals-locals-and-args &env x)
         yield? (i/yields? x)
         afn (if-not yield?
               `(fn ~names

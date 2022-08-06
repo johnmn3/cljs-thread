@@ -66,10 +66,8 @@
 
 (defn start-repl [configs]
   (when (and goog/DEBUG (:repl-connect-string configs))
-    (spawn {:id :repl :opts {:no-res? true}}
+    (spawn {:id :repl}
            (s/update-conf! configs))
-    (spawn {:id :repl-sync :opts {:no-res? true}}
+    (spawn {:id :repl-sync :no-globals? true}
        (on-when (contains? @s/peers :core)
          (dbg-repl)))))
-
-
