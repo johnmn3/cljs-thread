@@ -150,7 +150,7 @@ For most functions, `inmesh` will try to automatically convey local bindings, as
     @(in s1 (+ 1 @(in s2 (+ 2 x)))))
 ;=> 6
 ```
-That only works for symbols bound to the local scope of the form or top level defs of the current namespace. Therefore, this will not work:
+That works for both symbols bound to the local scope of the form and to top level defs of the current namespace. So this will work:
 ```clojure
 (def x 3)
 @(in s1 (+ 1 @(in s2 (+ 2 x))))
