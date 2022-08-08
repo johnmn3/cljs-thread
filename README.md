@@ -14,7 +14,7 @@ The `in` macro then abstracts over the message passing infrastructure, allowing 
 Place the following in the `:deps` map of your `deps.edn` file:
 ```
 ...
-net.clojars.john/inmesh {:mvn/version "0.1.0-alpha.3"}
+net.clojars.john/inmesh {:mvn/version "0.1.0-alpha.2"}
 ...
 ```
 ### Build Tools
@@ -165,26 +165,42 @@ Atoms will not be serialized. That would break the identity semantics that atoms
 - Declare the invocation with `:no-globals?` like `@(in s1 {:no-globals? true} (+ 1 @(in s2 (+ 2 @y))))`. This way, you can have `y` defined in the same namespace on both ends of the invocation but you'll be explicitly referencing the one on the remote side; or
 - Use an explicit conveyence vector that does not include the local symbol, like `@(in s1 [s2] (+ 1 @(in s2 (+ 2 @y))))`. Using explicit conveyance vectors disables implicit conveyance altogether.
 
-You can also explicity define a _conveyance vector_:
+As mentioned above, you can also explicity define a _conveyance vector_:
 ```clojure
-@(in s1 [x] (+ 1 @(in s2 (+ 2 x))))
+@(in s1 [x s2] (+ 1 @(in s2 (+ 2 x))))
 ;=> 6
 ```
-Here, `[x]` declares that we want to pass `x` (here defined as `3`) through to `s2`. We don't need to declare it again in `s2` because now it is implicitly conveyed as it is in the local scope of the form.
+Here, `[x s2]` declares that we want to pass `x` (here defined as `3`) through to `s2`. We don't need to declare it again in `s2` because now it is implicitly conveyed as it is in the local scope of the form.
 
-However, you can't currently mix both implicit and explicit binding conveyance:
+We could also avoid passing `s2` by simpling referencing it by its `:id`:
+```clojure
+@(in s1 [x] (+ 1 @(in :s2 (+ 2 x))))
+;=> 6
+```
+However, you can't mix both implicit and explicit binding conveyance:
 ```clojure
 (let [z 3]
-  @(in s1 [x] (+ 1 @(in s2 (+ x z)))))
+  @(in s1 [x] (+ 1 @(in :s2 (+ x z)))))
 ;=> nil
 ```
 Rather, this would work:
 ```clojure
 (let [z 3]
-  @(in s1 [x y] (+ 1 @(in s2 (+ x z)))))
+  @(in s1 [x y] (+ 1 @(in :s2 (+ x z)))))
 ;=> 7
 ```
-The explicit conveyance vector is essentially your escape hatch, for when the simple implicit conveyance isn't enough.
+The explicit conveyance vector is essentially your escape hatch, for when the simple implicit conveyance isn't enough or is too much.
+### `yield`
+
+When you want to convert an async javascript function into a synchronous one, `yield` is especially useful:
+```clojure
+(->> @(in s1 (-> (js/fetch "http://api.open-notify.org/iss-now.json")
+                 (.then #(.json %))
+                 (.then #(yield (js->clj % :keywordize-keys true)))))
+     :iss_position
+     (println "ISS Position:"))
+;ISS Position: {:latitude 44.4403, :longitude 177.0011}
+```
 > Note: binding conveyance and `yield` also work with `spawn`
 > ```clojure
 > (let [x 6]
@@ -198,18 +214,8 @@ The explicit conveyance vector is essentially your escape hatch, for when the si
 > ;=> 6
 >```
 > But that will take 10 to 100 times longer, due to worker startup delay, so make sure that your work is truly heavy and ephemeral. With re-frame, react and a few other megabytes of dev-time dependencies loaded in `/core.js`, that call took me about 1 second to complete - not very fast.
-### `yield`
 
-When you want to convert an async javascript function into a synchronous one, `yield` is especially useful:
-```clojure
-(->> @(in s1 (-> (js/fetch "http://api.open-notify.org/iss-now.json")
-                 (.then #(.json %))
-                 (.then #(yield (js->clj % :keywordize-keys true)))))
-     :iss_position
-     (println "ISS Position:"))
-;ISS Position: {:latitude 44.4403, :longitude 177.0011}
-```
-> Note: You can use `yield` to temporarily prevent the closing of an ephemeral `spawn` as well:
+> Also note: You can use `yield` to temporarily prevent the closing of an ephemeral `spawn` as well:
 >```clojure
 > @(spawn (js/setTimeout
 >          #(yield (println :finally!) (+ 1 2 3))
@@ -218,7 +224,6 @@ When you want to convert an async javascript function into a synchronous one, `y
 > ;=> 6
 >```
 > Where `6` took 5 seconds to return - handy for async tasks in ephemeral workers.
-
 ## `future`
 You don't have to create new workers though. `inmesh` comes with a thread pool of workers which you can invoke `future` on. Once invoked, it will grab one of the available workers, do the work on it and then free it when it's done.
 ```clojure
