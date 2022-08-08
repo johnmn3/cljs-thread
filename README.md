@@ -14,7 +14,7 @@ The `in` macro then abstracts over the message passing infrastructure, allowing 
 Place the following in the `:deps` map of your `deps.edn` file:
 ```
 ...
-net.clojars.john/inmesh {:mvn/version "0.1.0-alpha.2"}
+net.clojars.john/inmesh {:mvn/version "0.1.0-alpha.3"}
 ...
 ```
 ### Build Tools
