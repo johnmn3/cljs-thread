@@ -1,5 +1,5 @@
 (ns inmesh.core
-  (:require-macros [inmesh.core :refer [on-when spawn in]])
+  (:require-macros [inmesh.core :refer [on-when spawn]])
   (:require
    [inmesh.util :as u]
    [inmesh.env :as e]
@@ -9,11 +9,15 @@
    [inmesh.in]
    [inmesh.root :as r]
    [inmesh.db]
+   [inmesh.sync]
    [inmesh.repl]
    [inmesh.future]
-   [inmesh.injest]))
+   [inmesh.injest]
+   [inmesh.pmap]))
 
 (enable-console-print!)
+
+(def sleep inmesh.sync/sleep)
 
 (def ^:export id (:id e/data))
 
