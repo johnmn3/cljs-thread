@@ -14,18 +14,13 @@
 (mesh/init!
  {:sw-connect-string "/inmesh/sw.js"
   :repl-connect-string "/inmesh/repl.js"
-  :core-connect-string "/inmesh/core.js"
-  :future true
-  :injest true
-  :injest-count 4 #_(u/num-cores)})
+  :core-connect-string "/inmesh/core.js"})
+
 ;; #_
 (mesh/init!
  {:sw-connect-string "/sw.js"
   :repl-connect-string "/repl.js"
-  :core-connect-string "/core.js"
-  :future true
-  :injest true
-  :injest-count 4 #_(u/num-cores)})
+  :core-connect-string "/core.js"})
 
 (def debug?
   ^boolean goog.DEBUG)

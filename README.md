@@ -14,7 +14,7 @@ The `in` macro then abstracts over the message passing infrastructure, allowing 
 Place the following in the `:deps` map of your `deps.edn` file:
 ```
 ...
-net.clojars.john/inmesh {:mvn/version "0.1.0-alpha.3"}
+net.clojars.john/inmesh {:mvn/version "0.1.0-alpha.4"}
 ...
 ```
 ### Build Tools
@@ -245,8 +245,39 @@ Again, all of these constructs return promises on the main/screen thread:
 ```
 You wouldn't want to do this for such a lite-weight api call, but if you have some large payloads that you need fetched and normalized, it can be convenient to run them in futures for handling off the main thread.
 
-`inmesh`'s blocking semantics are great for achieving synchronous control flow when you need it, but as shown above, it has a performance cost of having to wait on the service worker to proxy results. Therefore, you wouldn't want to use them in very hot loops or for implementing tight algorithms. We can beat single threaded performance though if we're smart about chunking work up into large pieces and fanning it across a pool of workers. You can design your own system for doing that, but `inmesh` comes with a solution for pure functions: `=>>`.
+`inmesh`'s blocking semantics are great for achieving synchronous control flow when you need it, but as shown above, it has a performance cost of having to wait on the service worker to proxy results. Therefore, you wouldn't want to use them in very hot loops or for implementing tight algorithms. We can beat single threaded performance though if we're smart about chunking work up into large pieces and fanning it across a pool of workers. You can design your own system for doing that, but `inmesh` comes with a solution for pure functions: `=>>`. It also comes with a version of `pmap`. (see the official [`clojure.core/pmap`](https://clojuredocs.org/clojure.core/pmap) for more info)
 
+## `pmap`
+`pmap` lazily consumes one or more collections and maps a function across them in parallel.
+```clojure
+(def z inc)
+(let [i +]
+  (->> [1 2 3 4]
+       (pmap (fn [x y] (pr :x x :y y) (z (i x y))) [9 8 7 6])
+       (take 2)))
+;:x 9 :y 1
+;:x 8 :y 2
+;=> (11 11)
+```
+Taking an example from clojuredocs.org:
+```clojure
+;; A function that simulates a long-running process by calling mesh/sleep:
+(defn long-running-job [n]
+    (mesh/sleep 1000) ; wait for 1 second
+    (+ n 10))
+
+;; Use `doall` to eagerly evaluate `map`, which evaluates lazily by default.
+
+;; With `map`, the total elapsed time is just over 4 seconds:
+user=> (time (doall (map long-running-job (range 4))))
+"Elapsed time: 4012.500000 msecs"
+(10 11 12 13)
+
+;; With `pmap`, the total elapsed time is just over 1 second:
+user=> (time (doall (pmap long-running-job (range 4))))
+"Elapsed time: 1021.500000 msecs"
+(10 11 12 13)
+```
 ## `=>>`
 [`injest`](https://github.com/johnmn3/injest) is a library that makes it easier to work with transducers. It provides a `x>>` macro for Clojure and Clojurescript that converts thread-last macros (`->>`) into transducer chains. For Clojure, it provides a `=>>` variant that also parallelizes the transducers across a fork-join pool with `r/fold`. However, because we've been lacking blocking semantics in the browser, it was unable to provide the same macro to Clojurescript.
 
@@ -336,7 +367,9 @@ By evaluating `:in/exit`, the running break context exits and the execution proc
 ;=> 1
 ```
 
-This is just a rudimentary implementation of a stepping debugger. It would be nice to implement a sub-repl that wrapped repl evaluations in the `in?` macro until exit. It would also be nice to implement an nrepl middle where for the same thing, transparently filling in the missing bits for cider's debugging middleware, such that editors like emacs and calva can automatically use their debugging workflows in a Clojurescript context. There's [a github issue for this feature](https://github.com/clojure-emacs/cider/issues/1416) in the cider repo and it would be nice to finally be able to unlock this capability for browser development. PRs welcome!
+This is just a rudimentary implementation of a stepping debugger. I've added keybindings for usage in Calva.
+
+It would be nice to implement a sub-repl that wrapped repl evaluations in the `in?` macro until exit. It would also be nice to implement an nrepl middle where for the same thing, transparently filling in the missing bits for cider's debugging middleware, such that editors like emacs and calva can automatically use their debugging workflows in a Clojurescript context. There's [a github issue for this feature](https://github.com/clojure-emacs/cider/issues/1416) in the cider repo and it would be nice to finally be able to unlock this capability for browser development. PRs welcome!
 
 > Note: There are a host of other use cases that weren't previously possible that become possible with blocking semantics. Another example might be porting Datascript to IndexedDB using a synchronous set/get interface. If there are any other possibilities that come to mind - things you've always wanted to be able to do but weren't able to due to the lack of blocking semantics in the browser - feel free to drop a request in the issues and we can explore it.
 
