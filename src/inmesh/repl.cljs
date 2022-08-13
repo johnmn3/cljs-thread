@@ -12,19 +12,23 @@
 
 (def dbg-atom (atom {:running #{}}))
 
+(def local-dbg-id (atom nil))
+
 (defn dbg-repl []
   (when (= :repl-sync (:id e/data))
     (let [dbg-id (u/gen-id)]
+      (swap! dbg-atom update :running conj dbg-id)
       (loop []
-        (let [{:keys [sfn sargs break]} (sync/request :dbg-req {:id "dbg-repl"})]
+        (let [{:keys [sfn sargs break dbg-id]} (sync/request :dbg-req {:id "dbg-repl"})]
           (if break
             (do (sync/send-response {:request-id :dbg-res :response :no-break-running!})
                 (recur))
-            (let [result (inmesh.in/do-call
+            (let [_ (reset! local-dbg-id dbg-id)
+                  result (inmesh.in/do-call
                           {:data {:sfn sfn
                                   :sargs sargs
                                   :local? true}})]
-              (sync/send-response {:request-id :dbg-res :response result})
+              (sync/send-response {:request-id :dbg-res :response {:end-session? true :res result}})
               (recur))))))))
 
 (defn do-break [symvals ctx expr]
@@ -52,22 +56,37 @@
                         expr)
                     (do (sync/send-response {:request-id :dbg-res :response result})
                         (recur))))))))))))
-   
+
+(def remote-break (atom nil))
+
+(defn break-running? []
+  (not (nil? @remote-break)))
+
 (defn do-dbg [afn]
-  (let [sfn (str afn)]
-    (sync/send-response {:request-id :dbg-req :response {:sfn sfn :sargs [] :request-id :dbg-res}})
-    (let [res (sync/request :dbg-res)]
-      res)))
+  (let [sfn (str afn)
+        break-id (u/gen-id)]
+    (if (break-running?)
+      (println :break-running!)
+      (do (reset! remote-break break-id)
+          (sync/send-response {:request-id :dbg-req :dbg-id break-id :response {:sfn sfn :sargs [] :request-id :dbg-res}})
+          (let [result (sync/request :dbg-res)]
+            result)))))
 
 (defn dbg-> [symbols afn]
-  (let [sfn (str afn)]
-    (sync/send-response {:request-id :dbg-req :response {:break true :sfn sfn :sargs symbols :request-id :dbg-res}})
-    (sync/request :dbg-res)))
+  (if-not (break-running?)
+    (afn)
+    (let [sfn (str afn)]
+      (sync/send-response {:request-id :dbg-req :response {:break true :sfn sfn :sargs symbols :request-id :dbg-res}})
+      (let [{:keys [end-session? res] :as result} (sync/request :dbg-res)]
+        (if end-session?
+          (do (reset! remote-break nil)
+              res)
+          result)))))
 
 (defn start-repl [configs]
   (when (and goog/DEBUG (:repl-connect-string configs))
     (spawn {:id :repl}
            (s/update-conf! configs))
     (spawn {:id :repl-sync :no-globals? true}
-       (on-when (contains? @s/peers :core)
-         (dbg-repl)))))
+      (on-when (contains? @s/peers :core)
+        (dbg-repl)))))
