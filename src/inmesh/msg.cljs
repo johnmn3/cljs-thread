@@ -15,8 +15,8 @@
     (edn/read-string id)
     (str id)))
 
-(defn message-handler [e]
-  (let [data (.-data e)
+(defn message-handler [^js e]
+  (let [data (.-msg (.-data e))
         receive-port? (-> ^js data .-dispatch (= "receive-port"))
         data (if receive-port?
                (-> data (js->clj :keywordize-keys true)
@@ -41,8 +41,10 @@
   (swap! s/peers assoc-in [id :port] port)
   (set! (.-onmessage port) message-handler))
 
-(defn post [worker-id data & [transferables]]
-  (let [id (if (and (not (keyword? worker-id))
+(defn post [worker-id {:as data {:keys [transfers]} :data} & [transferables]]
+  (let [transferables (->> transfers (mapv (fn [[_k {:keys [transfer]}]]
+                                             transfer)))
+        id (if (and (not (keyword? worker-id))
                     (instance? IDable worker-id))
              (get-id worker-id)
              worker-id)]
@@ -54,16 +56,20 @@
           (let [w (or (-> @s/peers (get-in [:parent :port]))
                       (-> @s/peers (get-in [:parent :w])))]
             (.postMessage w
-                          ((if (-> data :dispatch (= :receive-port)) clj->js pr-str)
-                           {:dispatch :proxy
-                            :data data})
+                          #js {:transfers transfers
+                               :msg
+                               ((if (-> data :dispatch (= :receive-port)) clj->js pr-str)
+                                {:dispatch :proxy
+                                 :data data})}
                           (if transferables
                             (clj->js transferables)
                             #js [])))
           (.postMessage w
                         (if (-> data :dispatch (= :receive-port))
-                          (clj->js data)
-                          (str data))
+                          #js {:transfers transfers
+                               :msg (clj->js data)}
+                          #js {:transfers transfers
+                               :msg (str data)})
                         (if transferables
                           (clj->js transferables)
                           #js [])))))))
@@ -84,18 +90,18 @@
 (defn send-port [id c1]
   (post id {:dispatch :receive-port
             :data {:port c1
-                   :id (str (:id e/data))}}
-        [c1]))
+                   :transfers {1 {:transfer c1}}
+                   :id (str (:id e/data))}}))
 
 (defn dist-port [id1 id2 c1 c2]
   (post id1 {:dispatch :receive-port
              :data {:port c1
-                    :id (str id2)}}
-        [c1])
+                    :transfers {1 {:transfer c1}}
+                    :id (str id2)}})
   (post id2 {:dispatch :receive-port
              :data {:port c2
-                    :id (str id1)}}
-        [c2]))
+                    :transfers {1 {:transfer c2}}
+                    :id (str id1)}}))
 
 (defn add-port [id p]
   (swap! s/peers assoc-in [id :port] p)

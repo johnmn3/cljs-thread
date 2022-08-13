@@ -36,7 +36,7 @@
 (defn in-ie? []
   (or (in-browser? "MSIE")
       (in-browser? "rv:")))
-  
+
 (defn in-firefox? []
   (in-browser? "Firefox"))
 
@@ -54,3 +54,35 @@
         (in-firefox?) :firefox
         (in-safari?) :safari
         (in-opera?) :opera))
+
+(defn typed-array?
+  "Tests whether a given `value` is a typed array."
+  [value]
+  (let [value-type (type value)]
+    (or (when (exists? js/SharedArrayBuffer)
+          (= value-type js/SharedArrayBuffer)) ;; <- not yet tested
+        (= value-type js/Int8Array)
+        (= value-type js/Uint8Array)
+        (= value-type js/Uint8ClampedArray)
+        (= value-type js/Int16Array)
+        (= value-type js/Uint16Array)
+        (= value-type js/Int32Array)
+        (= value-type js/Uint32Array)
+        (= value-type js/Float32Array)
+        (= value-type js/Float64Array))))
+
+;; TODO: add transfer semantics for these types:
+  ;;:Blob.readAsArrayBuffer
+  ;;:File.readAsArrayBuffer
+  ;;:Base64
+  ;;:DataView
+  ;;:ArrayBuffer
+  ;;:MessagePort
+  ;;:ReadableStream
+  ;;:WritableStream
+  ;;:TransformStream
+  ;;:AudioData
+  ;;:ImageBitmap
+  ;;:VideoFrame
+  ;;:OffscreenCanvas
+  ;;:RTCDataChannel
