@@ -1,5 +1,5 @@
 (ns inmesh.core
-  (:refer-clojure :exclude [future])
+  (:refer-clojure :exclude [future pmap])
   (:require
    [injest.path]))
 
@@ -30,3 +30,6 @@
 
 (defmacro in? [& x]
   `(inmesh.repl/in? ~@x))
+
+(defmacro pmap [& x]
+  `(inmesh.pmap/pmap ~@x))

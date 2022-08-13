@@ -1,26 +1,35 @@
 (ns inmesh.macro-impl)
 
 (defn get-symbols [body]
-  (->> body
-       (tree-seq coll? seq)
-       (rest)
-       (filter (complement coll?))
-       (filter symbol?)
-       vec))
+  (let [body (if (symbol? body)
+               [body]
+               body)]
+    (->> body
+         (tree-seq coll? seq)
+         (rest)
+         (filter (complement coll?))
+         (filter symbol?)
+         vec)))
 
 (defn get-locals [env body]
-  (->> (filter (complement coll?)
-               (rest (tree-seq coll? seq body)))
-       (filter symbol?)
-       (map (:locals env))
-       (map :name)
-       (filter (comp not nil?))
-       vec
-       (#(do [% %]))))
+  (let [body (if (symbol? body)
+               [body]
+               body)]
+    (->> (filter (complement coll?)
+                 (rest (tree-seq coll? seq body)))
+         (filter symbol?)
+         (map (:locals env))
+         (map :name)
+         (filter (comp not nil?))
+         vec
+         (#(do [% %])))))
 
 (defn get-locals-and-globals [env body]
   (let [defs-and-locals (merge (:locals env)
-                               (into {} (map (fn [[k v]] [k {:name k}]) (:defs (:ns env)))))]
+                               (into {} (map (fn [[k v]] [k {:name k}]) (:defs (:ns env)))))
+        body (if (symbol? body)
+               [body]
+               body)]
     (->> (filter (complement coll?)
                  (rest (tree-seq coll? seq body)))
          (filter symbol?)
@@ -31,12 +40,14 @@
          (#(do [% %])))))
 
 (defn parse-in [x]
-  (let [f (first x)
-        s (second x)]
-    (cond (and (vector? f) (map? s)) [f s (rest (rest x))]
-          (vector? f) [f {} (rest x)]
-          (map? f) [[] f (rest x)]
-          :else [[] {} (vec x)])))
+  (if-not (coll? x)
+    [[] {} x]
+    (let [f (first x)
+          s (second x)]
+      (cond (and (vector? f) (map? s)) [f s (rest (rest x))]
+            (vector? f) [f {} (rest x)]
+            (map? f) [[] f (rest x)]
+            :else [[] {} (vec x)]))))
 
 (defn yield-form? [form]
   (when (seq? form)
