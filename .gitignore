@@ -12,3 +12,4 @@ shadow_dashboard/resources/public
 shadow_dashboard/.shadow-cljs
 .lsp/
 .portal
+.vscode

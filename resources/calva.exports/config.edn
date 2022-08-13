@@ -1,0 +1,18 @@
+{:customREPLCommandSnippets
+ [{:name    "inmesh send top-level form to debugger"
+   :repl    "cljs"
+   :snippet "(dbg $top-level-form)"
+   :key     "i"}
+  {:name    "inmesh inspect current local in break"
+   :repl    "cljs"
+   :snippet "(in? $current-form)"
+   :key     "l"}
+  {:name    "inmesh exit break"
+   :repl    "cljs"
+   :snippet "(in? :in/exit)"
+   :key     "e"}]}
+;; TODO: this is a bit too gratuitous - runs on every hover, over everything. Some conditionals down work in snippet code though
+;;  :customREPLHoverSnippets
+;;  [{:name "eval text on hover"
+;;    :repl "cljs"
+;;    :snippet "(or (in? $hover-current-form) (quote $hover-current-form))"}]}
