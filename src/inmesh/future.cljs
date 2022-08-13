@@ -26,7 +26,7 @@
   nil)
 
 (defn mk-worker-ids [n]
-  (let [ws (-> n (or (u/num-cores) (/ 2)))]
+  (let [ws (-> n (or (inc (u/num-cores))) (/ 2) int)]
     (->> ws range (map #(keyword (str "fp-" %))))))
 
 (defn init-future! [& [{:as config-map :keys [future-ids]}]]
@@ -37,22 +37,21 @@
       (swap! s/future-pool update :available into future-ids))))
 
 (defn start-futures [configs]
-  (when (or (:future configs) (:future-count configs) (:future-connect-string configs))
-    (let [future-ids (mk-worker-ids (:future-count configs 4))
-          future-conf (assoc configs :future-ids future-ids)]
-      (spawn {:id :future :no-globals? true}
-             (init-future! future-conf))
-      (->> future-ids
-           (mapv (fn [fid]
-                   (spawn {:id fid :no-globals? true}
-                          (s/update-conf! future-conf))))))))
+  (let [future-ids (mk-worker-ids (:future-count configs))
+        future-conf (assoc configs :future-ids future-ids)]
+    (spawn {:id :future :no-globals? true}
+           (init-future! future-conf))
+    (->> future-ids
+         (mapv (fn [fid]
+                 (spawn {:id fid :no-globals? true}
+                        (s/update-conf! future-conf)))))))
 
 (defn do-future [args afn opts]
   (let [fut-id (u/gen-id)]
-    (in :future
+    (in :future [args afn fut-id] ;; <- TODO: prevent implicit conveyer param duplication (dissallowed for arraybuffer transfers)
         (on-when (-> @s/future-pool :available seq) {:duration 5}
           (let [worker (take-worker!)]
-            (in worker
+            (in worker [args afn fut-id worker]
                 (try
                   (if (seq args)
                     ((apply afn args)
