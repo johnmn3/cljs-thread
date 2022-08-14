@@ -10,13 +10,13 @@
 ;;; Config
 (enable-console-print!)
 ; for docs release
-#_
+;; #_
 (thread/init!
  {:sw-connect-string "/cljs-thread/sw.js"
   :repl-connect-string "/cljs-thread/repl.js"
   :core-connect-string "/cljs-thread/core.js"})
 
-;; #_
+#_
 (thread/init!
  {:sw-connect-string "/sw.js"
   :repl-connect-string "/repl.js"
