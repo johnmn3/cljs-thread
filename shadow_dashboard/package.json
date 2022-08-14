@@ -1,5 +1,5 @@
 {
-  "name": "dashboard-inmesh-re-frame-comp.el",
+  "name": "dashboard-cljs-thread-re-frame-comp.el",
   "scripts": {
     "watch": "npx shadow-cljs watch client",
     "release": "npx shadow-cljs release client",
