@@ -1,5 +1,5 @@
 (ns cljs-thread.core
-  (:refer-clojure :exclude [future pmap pcalls])
+  (:refer-clojure :exclude [future pmap pcalls pvalues])
   (:require
    [injest.path]))
 
