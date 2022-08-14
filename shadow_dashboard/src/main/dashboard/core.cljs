@@ -5,9 +5,9 @@
    [dashboard.regs.home-panel]
    [dashboard.regs.shell]
    [dashboard.regs.sign-in]
-   [inmesh.env :as env]
-   [inmesh.state :as s]
-   [inmesh.core :as mesh :refer [future spawn in =>> dbg break in? pmap]]))
+   [cljs-thread.env :as env]
+   [cljs-thread.state :as s]
+   [cljs-thread.core :as thread :refer [future spawn in =>> dbg break in? pmap pcalls pvalues]]))
 
 (enable-console-print!)
 
@@ -27,12 +27,12 @@
     (->> @s/peers
          keys
          (filter (complement #{:sw}))
-         (mapv #(in % (println mesh/id :here))))
+         (mapv #(in % (println thread/id :here))))
 
     (->> @s/peers
          keys
          (filter (complement #{:sw}))
-         (mapv #(in % (str mesh/id :here)))
+         (mapv #(in % (str thread/id :here)))
          (map deref)
          (println :rollcall))
 
@@ -72,13 +72,21 @@
          (take 2)))
 
   (defn long-running-job [n]
-    (mesh/sleep 1000) ; wait for 1 second
+    (thread/sleep 1000) ; wait for 1 second
     (+ n 10))
 
   (future (println :res (time (doall (map long-running-job (range 4))))))
 
   (future (println :res (time (doall (pmap long-running-job (range 4))))))
 
+  (pcalls #(long-running-job 1) #(long-running-job 2))
+
+  (pvalues
+   (long-running-job 1)
+   (long-running-job 2)
+   (long-running-job 3)
+   (long-running-job 4)
+   (long-running-job 5))
 
   (dbg
    (let [x 1 y 3 z 5]
@@ -116,7 +124,7 @@
 
   (spawn (println :addition (+ 1 2 3)))
 
-  (def s2 (spawn {:id :s2} (println :hi :from mesh/id)))
+  (def s2 (spawn {:id :s2} (println :hi :from thread/id)))
 
   (println :ephemeral :result @(spawn (+ 1 2 3)))
 
@@ -155,7 +163,7 @@
     @(in s1 [x y s2] (+ 1 @(in s2 (+ x y)))))
 
   (let [x 6]
-    @(spawn (yield (+ x 2)) (println :i'm :ephemeral :in mesh/id)))
+    @(spawn (yield (+ x 2)) (println :i'm :ephemeral :in thread/id)))
 
   @(spawn (+ 1 @(spawn (+ 2 3))))
 

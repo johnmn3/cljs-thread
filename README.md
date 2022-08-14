@@ -1,12 +1,12 @@
-# `inmesh`: `spawn`, `in`, `future` and `=>>`
+# `cljs-thread`: `spawn`, `in`, `future`, `pmap`, `pcalls`, `pvalues` and `=>>`
 
 ## _"One step closer to threads on the web"_
 
-`inmesh` makes using webworkers take less... work. Eventually, I'd like it to be able to minimize the amount of build tool configuration it takes to spawn workers in Clojurescript too, but that's a longer term goal.
+`cljs-thread` makes using webworkers take less... work. Eventually, I'd like it to be able to minimize the amount of build tool configuration it takes to spawn workers in Clojurescript too, but that's a longer term goal.
 
-When you spawn a node, it automatically creates connections to all the other nodes, creating a fully connected mesh - thus the term `inmesh`.
+When you `spawn` a node, it automatically creates connections to all the other nodes, creating a fully connected mesh.
 
-The `in` macro then abstracts over the message passing infrastructure, allowing you to do work on threads in a manner similar to what you would experience with threads in other languages.
+The `in` macro then abstracts over the message passing infrastructure, with implicit binding conveyance and blocking semantics, allowing you to do work on threads in a manner similar to what you would experience with threads in Clojure and other languages. `cljs-thread` provides familiar constructs like `future`, `pmap`, `pcalls` and `pvalues`. For transducing over large sequences in parallel, the `=>>` thread-last macro is provided.
 
 ## Getting Started
 
@@ -14,7 +14,7 @@ The `in` macro then abstracts over the message passing infrastructure, allowing 
 Place the following in the `:deps` map of your `deps.edn` file:
 ```
 ...
-net.clojars.john/inmesh {:mvn/version "0.1.0-alpha.4"}
+net.clojars.john/cljs-thread {:mvn/version "0.1.0-alpha.4"}
 ...
 ```
 ### Build Tools
@@ -61,20 +61,18 @@ There currently isn't a figwheel build configuration example provided in this re
 #### cljs.main
 As with figwheel, a solid set of directions for getting this working with the default `cljs.main` build tools is forthcoming - PRs welcome!
 
-### inmesh.core/init!
-Eventually, once all the different build tools have robust configurations, I would like to iron out a set of default configurations within `inmesh` such that things Just Work - just like spawning threads on the JVM. For now, you have to provide `inmesh` details on what your build configuration is _in code_ with `inmesh.core/init!` like so:
+### cljs-thread.core/init!
+Eventually, once all the different build tools have robust configurations, I would like to iron out a set of default configurations within `cljs-thread` such that things Just Work - just like spawning threads on the JVM. For now, you have to provide `cljs-thread` details on what your build configuration is _in code_ with `cljs-thread.core/init!` like so:
 ```
-(mesh/init!
+(thread/init!
  {:sw-connect-string "/sw.js"
   :repl-connect-string "/repl.js"
-  :core-connect-string "/core.js"
-  :future true
-  :injest true})
+  :core-connect-string "/core.js"})
 ```
 `:sw-connect-string` defines where your service worker artifact is found, relative to the base directory of your server. Same goes for `:repl-connect-string` and `:core-connect-string`. You can also provide a `:root-connect-string`, `:future-connect-string` and `:injest-connect-string` - if you don't, they will default to your `:core-connect-string`.
 
 ## Demo
-https://johnmn3.github.io/inmesh/
+https://johnmn3.github.io/cljs-thread/
 
 The `shadow-dashboard` example project contains a standard dashboard demo built on re-frame/mui-v5/comp.el/sync-IndexedDB, with application logic (reg-subs & reg-event functions) moved into a webworker, where only react rendering is handled on the screen thread, allowing for buttery-smooth components backed by large data transformations in the workers.
 
@@ -98,7 +96,7 @@ This will create a webworker, run the code in it (presumably for side effects) a
 
 _Named worker_:
 ```clojure
-(def s2 (spawn {:id :s2} (println :hi :from mesh/id)))
+(def s2 (spawn {:id :s2} (println :hi :from thread/id)))
 ;:hi :from :s2
 ```
 This creates a webworker named `:s2` and you'll be able to do something with `s2` afterwards.
@@ -144,7 +142,7 @@ You can also deref the return value of `in`:
 ;=> 6
 ```
 ### Binding conveyance
-For most functions, `inmesh` will try to automatically convey local bindings, as well as vars local to the invoking namespace, across workers:
+For most functions, `cljs-thread` will try to automatically convey local bindings, as well as vars local to the invoking namespace, across workers:
 ```clojure
 (let [x 3] 
     @(in s1 (+ 1 @(in s2 (+ 2 x)))))
@@ -225,7 +223,7 @@ When you want to convert an async javascript function into a synchronous one, `y
 >```
 > Where `6` took 5 seconds to return - handy for async tasks in ephemeral workers.
 ## `future`
-You don't have to create new workers though. `inmesh` comes with a thread pool of workers which you can invoke `future` on. Once invoked, it will grab one of the available workers, do the work on it and then free it when it's done.
+You don't have to create new workers though. `cljs-thread` comes with a thread pool of workers which you can invoke `future` on. Once invoked, it will grab one of the available workers, do the work on it and then free it when it's done.
 ```clojure
 (let [x 2]
   @(future (+ 1 @(future (+ x 3)))))
@@ -245,7 +243,7 @@ Again, all of these constructs return promises on the main/screen thread:
 ```
 You wouldn't want to do this for such a lite-weight api call, but if you have some large payloads that you need fetched and normalized, it can be convenient to run them in futures for handling off the main thread.
 
-`inmesh`'s blocking semantics are great for achieving synchronous control flow when you need it, but as shown above, it has a performance cost of having to wait on the service worker to proxy results. Therefore, you wouldn't want to use them in very hot loops or for implementing tight algorithms. We can beat single threaded performance though if we're smart about chunking work up into large pieces and fanning it across a pool of workers. You can design your own system for doing that, but `inmesh` comes with a solution for pure functions: `=>>`. It also comes with a version of `pmap`. (see the official [`clojure.core/pmap`](https://clojuredocs.org/clojure.core/pmap) for more info)
+`cljs-thread`'s blocking semantics are great for achieving synchronous control flow when you need it, but as shown above, it has a performance cost of having to wait on the service worker to proxy results. Therefore, you wouldn't want to use them in very hot loops or for implementing tight algorithms. We can beat single threaded performance though if we're smart about chunking work up into large pieces and fanning it across a pool of workers. You can design your own system for doing that, but `cljs-thread` comes with a solution for pure functions: `=>>`. It also comes with a version of `pmap`. (see the official [`clojure.core/pmap`](https://clojuredocs.org/clojure.core/pmap) for more info)
 
 ## `pmap`
 `pmap` lazily consumes one or more collections and maps a function across them in parallel.
@@ -261,9 +259,9 @@ You wouldn't want to do this for such a lite-weight api call, but if you have so
 ```
 Taking an example from clojuredocs.org:
 ```clojure
-;; A function that simulates a long-running process by calling mesh/sleep:
+;; A function that simulates a long-running process by calling thread/sleep:
 (defn long-running-job [n]
-    (mesh/sleep 1000) ; wait for 1 second
+    (thread/sleep 1000) ; wait for 1 second
     (+ n 10))
 
 ;; Use `doall` to eagerly evaluate `map`, which evaluates lazily by default.
@@ -281,7 +279,7 @@ user=> (time (doall (pmap long-running-job (range 4))))
 ## `=>>`
 [`injest`](https://github.com/johnmn3/injest) is a library that makes it easier to work with transducers. It provides a `x>>` macro for Clojure and Clojurescript that converts thread-last macros (`->>`) into transducer chains. For Clojure, it provides a `=>>` variant that also parallelizes the transducers across a fork-join pool with `r/fold`. However, because we've been lacking blocking semantics in the browser, it was unable to provide the same macro to Clojurescript.
 
-`inmesh` provides the auto-transducifying, auto-parallelizing `=>>` macro that `injest` was missing.
+`cljs-thread` provides the auto-transducifying, auto-parallelizing `=>>` macro that `injest` was missing.
 
 So, suppose you have some non-trivial work:
 ```clojure
@@ -320,7 +318,7 @@ So in Chrome and Safari, you can roughly double your speed and in Firefox you ca
 
 ## Stepping debugger
 
-The blocking semantics that `inmesh` provides open up the doors to a lot of things that weren't possible in Clojurescript/Javascript and the browser in general. One of these things is a stepping debugger in the runtime (outside of the JS console debugger). `inmesh` ships with a simple example of a stepping debugger:
+The blocking semantics that `cljs-thread` provides open up the doors to a lot of things that weren't possible in Clojurescript/Javascript and the browser in general. One of these things is a stepping debugger in the runtime (outside of the JS console debugger). `cljs-thread` ships with a simple example of a stepping debugger:
 ```clojure
 (dbg
  (let [x 1 y 3 z 5]
@@ -375,8 +373,8 @@ It would be nice to implement a sub-repl that wrapped repl evaluations in the `i
 
 ## Some history
 
-`in.mesh` is derived from [`tau.alpha`](https://github.com/johnmn3/tau.alpha) which I released about four years ago. That project evolved towards working with SharedArrayBuffers (SABs). A slightly update version of `tau.alpha` is available here: https://gitlab.com/johnmn3/tau and you can see a demo of the benefits of SABs here: https://simultaneous.netlify.app/
+`cljs-thread` is derived from [`tau.alpha`](https://github.com/johnmn3/tau.alpha) which I released about four years ago. That project evolved towards working with SharedArrayBuffers (SABs). A slightly update version of `tau.alpha` is available here: https://gitlab.com/johnmn3/tau and you can see a demo of the benefits of SABs here: https://simultaneous.netlify.app/
 
 At an early point during the development of `tau.alpha` about four years ago, I got blocking semantics to work with these synchronous XHRs and hacking the response from a sharedworker. I eventually abandoned this strategy when I discovered you could get blocking semantics and better performance out of SABs and `js/Atomics`.
 
-Unfortunately there was lot's of drama around the security of SABs and, years later, they require very constraining security settings, making their usage impractical for some deployment situations. Compared to using typed arrays in `tau.alpha`, you'll never get that same performance in `inmesh`, in terms of worker-to-worker communication - in `tau.alpha` you're literally using shared memory - but there's no reason these other features shouldn't be available in non-SAB scenarios, so I figured it would make sense to extract these other bits out into `inmesh` and build V2 of `tau.alpha` on top of it. With `tau.beta`, built on `inmesh`, I'll be implementing SAB-less variants of `atom`s and `agent`s, with similar semantics to that of Clojure's. Then I'll be implementing SAB-based versions that folks can opt in to if desired.
+Unfortunately there was lot's of drama around the security of SABs and, years later, they require very constraining security settings, making their usage impractical for some deployment situations. Compared to using typed arrays in `tau.alpha`, you'll never get that same performance in `cljs-thread`, in terms of worker-to-worker communication - in `tau.alpha` you're literally using shared memory - but there's no reason these other features shouldn't be available in non-SAB scenarios, so I figured it would make sense to extract these other bits out into `cljs-thread` and build V2 of `tau.alpha` on top of it. With `tau.beta`, built on `cljs-thread`, I'll be implementing SAB-less variants of `atom`s and `agent`s, with similar semantics to that of Clojure's. Then I'll be implementing SAB-based versions that folks can opt in to if desired.

@@ -2,8 +2,8 @@
   (:require
    [reagent.dom :as rdom]
    [comp.el :as c]
-   [inmesh.core :as mesh]
-   [inmesh.re-frame :refer [subscribe]]
+   [cljs-thread.core :as thread]
+   [cljs-thread.re-frame :refer [subscribe]]
    [dashboard.routes :as routes]
    [dashboard.shell :as shell]))
 
@@ -11,13 +11,13 @@
 (enable-console-print!)
 ; for docs release
 #_
-(mesh/init!
- {:sw-connect-string "/inmesh/sw.js"
-  :repl-connect-string "/inmesh/repl.js"
-  :core-connect-string "/inmesh/core.js"})
+(thread/init!
+ {:sw-connect-string "/cljs-thread/sw.js"
+  :repl-connect-string "/cljs-thread/repl.js"
+  :core-connect-string "/cljs-thread/core.js"})
 
 ;; #_
-(mesh/init!
+(thread/init!
  {:sw-connect-string "/sw.js"
   :repl-connect-string "/repl.js"
   :core-connect-string "/core.js"})

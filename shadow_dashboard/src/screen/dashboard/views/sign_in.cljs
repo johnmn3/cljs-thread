@@ -2,7 +2,7 @@
   (:require
    [reagent.core :as reagent]
    [comp.el :as c]
-   [inmesh.re-frame :refer [dispatch subscribe]]
+   [cljs-thread.re-frame :refer [dispatch subscribe]]
    [dashboard.footer :refer [copyright]]))
 
 ;;; Styles

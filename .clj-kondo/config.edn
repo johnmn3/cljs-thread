@@ -1,1 +1,1 @@
-{:config-paths ["../resources/clj-kondo.exports/net.clojars.john/inmesh"]}
+{:config-paths ["../resources/clj-kondo.exports/net.clojars.john/cljs-thread"]}

@@ -1,13 +1,13 @@
 {:customREPLCommandSnippets
- [{:name    "inmesh send top-level form to debugger"
+ [{:name    "cljs-thread send top-level form to debugger"
    :repl    "cljs"
    :snippet "(dbg $top-level-form)"
    :key     "i"}
-  {:name    "inmesh inspect current local in break"
+  {:name    "cljs-thread inspect current local in break"
    :repl    "cljs"
    :snippet "(in? $current-form)"
    :key     "l"}
-  {:name    "inmesh exit break"
+  {:name    "cljs-thread exit break"
    :repl    "cljs"
    :snippet "(in? :in/exit)"
    :key     "e"}]}

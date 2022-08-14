@@ -13,7 +13,7 @@
                                      :sha     "8dc9f904d2328cbe62230044d299f71734df0168"}
         BrianChevalier/radiant      {:git/url "https://github.com/johnmn3/radiant.git"
                                      :sha     "20e5dedd09275f27b2146a629a0b92078963db7b"}
-        inmesh/inmesh {:local/root "../"}}
+        cljs-thread/cljs-thread {:local/root "../"}}
  :aliases
  {:cljs
   {:extra-deps {thheller/shadow-cljs {:mvn/version "2.19.5"}

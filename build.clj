@@ -2,17 +2,17 @@
   (:refer-clojure :exclude [test])
   (:require [org.corfield.build :as bb]))
 
-(def lib 'net.clojars.john/inmesh)
+(def lib 'net.clojars.john/cljs-thread)
 (def version "0.1.0-alpha.3")
 
 ;; clojure -T:build ci
 ;; clojure -T:build deploy
 
-(def url "https://github.com/johnmn3/inmesh")
+(def url "https://github.com/johnmn3/cljs-thread")
 
 (def scm {:url url
-          :connection "scm:git:git://github.com/johnmn3/inmesh.git"
-          :developerConnection "scm:git:ssh://git@github.com/johnmn3/inmesh.git"
+          :connection "scm:git:git://github.com/johnmn3/cljs-thread.git"
+          :developerConnection "scm:git:ssh://git@github.com/johnmn3/cljs-thread.git"
           :tag version})
 
 (defn test "Run the tests." [opts]

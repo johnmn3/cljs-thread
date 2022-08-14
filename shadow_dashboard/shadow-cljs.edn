@@ -16,7 +16,7 @@
   :sw
   {:target :browser
    :output-dir "resources/public"
-   :modules {:sw {:entries [inmesh.sw]
+   :modules {:sw {:entries [cljs-thread.sw]
                   :web-worker true}}}
   :core
   {:target     :browser

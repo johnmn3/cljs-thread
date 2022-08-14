@@ -3,11 +3,10 @@
    [reagent.core :as reagent]
    [comp.el :as c]
    [re-frame.core]
-   [inmesh.re-frame :refer [dispatch subscribe]]
+   [cljs-thread.re-frame :refer [dispatch subscribe]]
    [reitit.frontend.easy :as rfe]
    [dashboard.routes :as routes]
    [reitit.core :as reitit]))
-  ;;  [inmesh.core :as mesh :refer [in]]))
 
 ;; styles
 

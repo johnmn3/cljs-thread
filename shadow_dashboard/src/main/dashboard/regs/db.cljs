@@ -1,9 +1,9 @@
 (ns dashboard.regs.db
   (:require
    [re-frame.core :as rf]
-   [inmesh.env :refer [in-core?]]
-   [inmesh.re-frame :refer [reg-sub]]
-   [inmesh.db :refer [db-get db-set!]]))
+   [cljs-thread.env :refer [in-core?]]
+   [cljs-thread.re-frame :refer [reg-sub]]
+   [cljs-thread.db :refer [db-get db-set!]]))
  
 (def ls-key "local-store")
 

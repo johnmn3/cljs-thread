@@ -1,7 +1,7 @@
 (ns dashboard.regs.home-panel
   (:require
    [re-frame.core :as rf]
-   [inmesh.re-frame :refer [reg-sub]]))
+   [cljs-thread.re-frame :refer [reg-sub]]))
 
 ;;; Subs
 

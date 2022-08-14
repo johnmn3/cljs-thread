@@ -1,6 +1,6 @@
 (ns dashboard.views.home-panel
   (:require
-   [inmesh.re-frame :refer [subscribe]]
+   [cljs-thread.re-frame :refer [subscribe]]
    [dashboard.footer :refer [copyright]]
    ["react-chartjs-2" :refer [Line]]
    [comp.el :as c]))

@@ -2,8 +2,7 @@
   (:require
    [dashboard.regs.db :as db]
    [re-frame.core :as rf]
-  ;;  [inmesh.core :as mesh :refer [in]]
-   [inmesh.re-frame :refer [reg-sub]]))
+   [cljs-thread.re-frame :refer [reg-sub]]))
 
 ;; subs
 (reg-sub

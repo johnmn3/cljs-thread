@@ -1,5 +1,0 @@
-{:lint-as {inmesh.core/=>> clojure.core/->>}
- :hooks {:macroexpand {inmesh.core/in inmesh.core/in
-                       inmesh.core/future inmesh.core/future
-                       inmesh.core/wait inmesh.core/wait
-                       inmesh.core/in? inmesh.core/in?}}}
