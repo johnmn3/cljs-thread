@@ -312,9 +312,9 @@ On Chrome, that'll take only about 8 to 10 seconds. On Safari it takes about 30 
 
 So in Chrome and Safari, you can roughly double your speed and in Firefox you can go three or more times faster.
 
-`=>>` does not yet have binding conveyance (you just have to send the values down the pipeline). By changing only one character, we can double or triple our performance, all while leaving the main thread free to render at 60 frames per second. Notice also how it's lazy :)
+By changing only one character, we can double or triple our performance, all while leaving the main thread free to render at 60 frames per second. Notice also how it's lazy :)
 
-> Note: On the main/screen thread, `=>>` returns a promise. `=>>` defaults to a chunk size of 512. We'll probably add a `pmap` in the future that has a chunk size of 1, for fanning side-effecting functions if you want. PRs welcome!
+> Note: On the main/screen thread, `=>>` returns a promise. `=>>` defaults to a chunk size of 512.
 
 ## Stepping debugger
 
