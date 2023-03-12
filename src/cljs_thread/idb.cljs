@@ -3,14 +3,14 @@
    [clojure.edn :as edn]
    [cljs-thread.env :as e]
    [cljs-thread.state :as s]
-   [cljs-thread.on-when :refer [on-when]]))
+   [cljs-thread.on-when :refer [on-watch]]))
 
 (def idb-key "cljs-thread.db")
 
 (def open? (atom false))
 
 (defn ^:export idb-set! [k data & [yield]]
-  (on-when @open?
+  (on-watch open? true?
     (let [adb @s/idb
           transaction (.transaction adb #js [idb-key] "readwrite")
           os (.objectStore transaction idb-key)
@@ -21,7 +21,7 @@
       (set! (.-oncomplete req) #(println :set :complete!)))))
 
 (defn ^:export idb-get [k yield]
-  (on-when @open?
+  (on-watch open? true?
     (let [adb @s/idb
           req (-> adb
                   (.transaction #js [idb-key])
@@ -34,7 +34,7 @@
         (set! (.-onsuccess req) #(let [res (-> % .-target .-result edn/read-string)]
                                    (yield {:res res})))))))
 
-(when (= :db (:id e/data))
+(defn startup []
   (let [request (.open js/indexedDB idb-key 1)]
     (set! (.-onerror request) #(do (println :idb-open-error %)))
     (set! (.-onsuccess request)
@@ -51,3 +51,9 @@
                                 (.transaction idb-key "readwrite")
                                 (.objectStore idb-key))]
                         (reset! open? true))))))))
+
+(when (= :db (:id e/data))
+  (swap! open? (constantly false))
+  (on-watch open? false?
+    (startup))
+  (swap! open? identity))

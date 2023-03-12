@@ -1,4 +1,4 @@
-{:deps {org.clojure/clojurescript {:mvn/version "1.10.758"}
+{:deps {org.clojure/clojurescript {:mvn/version "1.11.60"}
         net.clojars.john/injest {:mvn/version "0.1.0-beta.8"}}
  :aliases
  {:test

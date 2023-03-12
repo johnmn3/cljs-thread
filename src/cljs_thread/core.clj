@@ -22,6 +22,9 @@
 (defmacro on-when [& x]
   `(cljs-thread.on-when/on-when ~@x))
 
+(defmacro on-watch [& x]
+  `(cljs-thread.on-when/on-watch ~@x))
+
 (defmacro dbg [& x]
   `(cljs-thread.repl/dbg ~@x))
 

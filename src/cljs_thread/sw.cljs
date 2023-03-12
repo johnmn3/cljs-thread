@@ -2,7 +2,7 @@
   (:require
    [clojure.edn :as edn]
    [cljs-thread.env :as e]
-   [cljs-thread.on-when :refer [on-when]]
+   [cljs-thread.on-when :refer [on-watch]]
    [cljs-thread.state :as s]
    [cljs-thread.util :as u]))
 
@@ -17,7 +17,9 @@
   (js/Response. result
                 #js {"headers"
                      #js {"content-type" "text/html; charset=utf-8"
-                          "Cache-Control" "max-age=31556952,immutable"}}))
+                          "Cache-Control" "max-age=31556952,immutable"
+                          "Cross-Origin-Opener-Policy" "same-origin"
+                          "Cross-Origin-Embedder-Policy" "credentialless"}}))
 
 (defn wake []
   (response "Wake up!"))
@@ -40,7 +42,9 @@
         (let [p (js/Promise. (fn [resolve _reject]
                                (swap! s/requests assoc request-id resolve)))]
           (.respondWith e p)))
-      (.respondWith e (-> (on-when (contains? @s/responses request-id) {:duration duration :max-time max-time}
+      (.respondWith e (-> (on-watch s/responses
+                                    #(contains? % request-id)
+                                    {:max-time max-time}
                                    (let [result (get @s/responses request-id)]
                                      (swap! s/responses dissoc request-id)
                                      (response result)))
@@ -76,8 +80,11 @@
 
 (when (e/in-sw?)
 
+  (s/shake s/responses :seconds 1 :limit 120)
+  (s/shake s/responses :seconds 30)
   (.addEventListener js/self "install" #(js/self.skipWaiting))
-  (.addEventListener js/self "activate" #(.waitUntil % (js/self.clients.claim)))
+  ;; (.addEventListener js/self "activate" #(.waitUntil % (js/self.clients.claim)))
+  (.addEventListener js/self "activate" #(js/self.clients.claim))
   (.addEventListener js/self "fetch" fetch-response)
 
   :end)

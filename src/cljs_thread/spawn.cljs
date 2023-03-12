@@ -22,6 +22,15 @@
       (.then #(when-not (.-controller js/navigator.serviceWorker)
                 (.reload js/window.location)))))
 
+(defn on-sw-registration [cb else-cb]
+  (-> (js/navigator.serviceWorker.getRegistration)
+      (.then #(do (println :in-cb)
+                  (if (.-controller js/navigator.serviceWorker)
+                    (do (println :registrations %)
+                        (cb))
+                    (do (println :no-registration)
+                        (else-cb)))))))
+
 (defn link [id]
   (when-not (-> @s/peers (get-in [id :port]))
     (if (e/in-screen?)
@@ -52,13 +61,17 @@
 (defn spawn-sw [init-callback]
   (let [url (str (get-connection-string {:id :sw})
                  (u/encode-qp {:id :sw}))]
-    (-> (js/navigator.serviceWorker.register url)
-        (after-sw-registration
-         #(do (if (.-active %)
-                (m/add-port :sw (.-active %))
-                (do (m/add-port :sw (.-installing %))
-                    (.reload js/window.location)))
-              (init-callback))))))
+    (on-sw-registration
+     #(init-callback)
+     #(-> (js/navigator.serviceWorker.register url)
+          (after-sw-registration
+           (fn []
+             (if (.-active %)
+               (m/add-port :sw (.-active %))
+               (do (m/add-port :sw (.-installing %))
+                   (.reload js/window.location)))
+             (init-callback)))))))
+    
 
 (defn root-spawn [{:as data :keys [deamon?]}]
   (let [id (u/gen-id data)
@@ -75,13 +88,15 @@
                  :data {:sfn (str (fn [])) :from (:id e/data) :to id}})))
     id))
 
+(defn pair-ids [id1 id2]
+  (let [[c1 c2] (m/mk-chan-pair)]
+    (m/dist-port id1 id2 c1 c2)))
+
 (defn meshify [id]
-  (let [peer-ids (filter (complement #{id}) (keys @s/peers))]
+  (let [peer-ids (filter (complement #{id :parent}) (keys @s/peers))]
     (when (seq peer-ids)
       (->> peer-ids
-           (mapv #(let [[c1 c2] (m/mk-chan-pair)]
-                    (when-not (= % :parent)
-                      (m/dist-port id % c1 c2))))))))
+           (mapv (partial pair-ids id))))))
 
 (defn local-spawn [{:as data :keys [deamon?]}]
   (assert (or (and (e/in-root?) (not (u/in-safari?)) (not (= (:id data) :sw)))
@@ -121,7 +136,7 @@
         (send-spawn :screen data))
       (if (e/in-root?)
         (local-spawn data)
-        (if (and (e/in-screen?) (= id :root))
+        (if (and (e/in-screen?) (or (= id :core) (= id :root)))
           (local-spawn data)
           (send-spawn :root data))))
     (sync/wrap-derefable data)))

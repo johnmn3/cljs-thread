@@ -6,10 +6,15 @@
    [dashboard.regs.shell]
    [dashboard.regs.sign-in]
    [cljs-thread.env :as env]
-   [cljs-thread.state :as s]
    [cljs-thread.core :as thread :refer [future spawn in =>> dbg break in? pmap pcalls pvalues]]))
 
 (enable-console-print!)
+
+(comment
+
+  (println :sab? (exists? js/SharedArrayBuffer))
+
+  :end)
 
 (defn init! []
   (when (env/in-core?)

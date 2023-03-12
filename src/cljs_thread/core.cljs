@@ -1,5 +1,5 @@
 (ns cljs-thread.core
-  (:require-macros [cljs-thread.core :refer [on-when spawn]])
+  (:require-macros [cljs-thread.core :refer [spawn]])
   (:require
    [cljs-thread.util :as u]
    [cljs-thread.env :as e]
@@ -9,6 +9,7 @@
    [cljs-thread.in]
    [cljs-thread.root :as r]
    [cljs-thread.db]
+   [cljs-thread.msg :as m]
    [cljs-thread.sync]
    [cljs-thread.repl]
    [cljs-thread.future]
@@ -21,10 +22,6 @@
 
 (def ^:export id (:id e/data))
 
-(when-not (e/in-core?)
-  (on-when (contains? @s/peers :core)
-    (reset! s/ready? true)))
-
 (defn init! [& [config-map]]
   (assert (e/in-screen?))
   (when config-map
@@ -33,8 +30,12 @@
     (if-not (:sw-connect-string config)
       (spawn {:id :root :no-globals? true}
              (r/init-root! config))
-      (do (sp/spawn-sw #(spawn {:id :root :no-globals? true}
-                               (r/init-root! config)))
+      (do (sp/spawn-sw
+           #(spawn {:id :root :no-globals? true}
+                   (spawn {:id :core :no-globals? true})
+                   (spawn {:id :db :no-globals? true})
+                   (m/pair-ids :core :db)
+                   (r/init-root! config)))
           (when-not (u/in-safari?)
             (sp/on-sw-registration-reload))))))
 

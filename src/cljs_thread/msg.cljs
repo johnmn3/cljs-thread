@@ -41,38 +41,61 @@
   (swap! s/peers assoc-in [id :port] port)
   (set! (.-onmessage port) message-handler))
 
+(defn when-peer-ready [id afn & [watch-key]]
+  (let [watch-key (or watch-key (str id "-" (hash afn) "-" (gensym)))]
+    (if (get @s/peers id)
+      (afn)
+      (add-watch
+       s/peers
+       watch-key
+       #(do (remove-watch s/peers watch-key)
+            (when-peer-ready id afn watch-key))))))
+
 (defn post [worker-id {:as data {:keys [transfers]} :data} & [transferables]]
   (let [transferables (->> transfers (mapv (fn [[_k {:keys [transfer]}]]
                                              transfer)))
         id (if (and (not (keyword? worker-id))
                     (instance? IDable worker-id))
              (get-id worker-id)
-             worker-id)]
+             worker-id)
+        data (assoc data :from (:id e/data))]
     (if (= :here id)
       (dispatch data)
       (let [w (or (-> @s/peers (get-in [id :port]))
                   (-> @s/peers (get-in [id :w])))]
-        (if (and (not (e/in-screen?)) (not w))
-          (let [w (or (-> @s/peers (get-in [:parent :port]))
-                      (-> @s/peers (get-in [:parent :w])))]
-            (.postMessage w
-                          #js {:transfers transfers
-                               :msg
-                               ((if (-> data :dispatch (= :receive-port)) clj->js pr-str)
-                                {:dispatch :proxy
-                                 :data data})}
-                          (if transferables
-                            (clj->js transferables)
-                            #js [])))
-          (.postMessage w
-                        (if (-> data :dispatch (= :receive-port))
-                          #js {:transfers transfers
-                               :msg (clj->js data)}
-                          #js {:transfers transfers
-                               :msg (str data)})
-                        (if transferables
-                          (clj->js transferables)
-                          #js [])))))))
+        (try
+          (if (and (not (e/in-screen?)) (not w))
+            (let [w (or (-> @s/peers (get-in [:parent :port]))
+                        (-> @s/peers (get-in [:parent :w])))]
+              (.postMessage w
+                            #js {:transfers transfers
+                                 :msg
+                                 ((if (-> data :dispatch (= :receive-port)) clj->js pr-str)
+                                  {:dispatch :proxy
+                                   :data data})}
+                            (if transferables
+                              (clj->js transferables)
+                              #js [])))
+            (when-peer-ready id
+                             #(let [w (or (-> @s/peers (get-in [id :port]))
+                                          (-> @s/peers (get-in [id :w])))]
+                                (.postMessage w
+                                              (if (-> data :dispatch (= :receive-port))
+                                                #js {:transfers transfers
+                                                     :msg (clj->js data)}
+                                                #js {:transfers transfers
+                                                     :msg (str data)})
+                                              (if transferables
+                                                (clj->js transferables)
+                                                #js [])))))
+          (catch :default e
+            (println :id (:id e/data))
+            (println :e e)
+            (println :w w)
+            (println :worker-id worker-id)
+            (println :data data)
+            (when-peer-ready id
+                             #(post worker-id data transferables))))))))
 
 (defmethod dispatch :proxy
   [{data :data}]
@@ -102,6 +125,10 @@
              :data {:port c2
                     :transfers {1 {:transfer c2}}
                     :id (str id1)}}))
+
+(defn pair-ids [id1 id2]
+  (let [[c1 c2] (mk-chan-pair)]
+    (dist-port id1 id2 c1 c2)))
 
 (defn add-port [id p]
   (swap! s/peers assoc-in [id :port] p)

@@ -6,7 +6,6 @@
             [cljs-thread.env :as e]
             [cljs-thread.id :refer [get-id IDable]]
             [cljs-thread.msg :as m]
-            [cljs-thread.on-when :refer [on-when]]
             [cljs-thread.state :as s]
             [cljs-thread.sync :as sync]
             [cljs-thread.util :as u]))
@@ -99,10 +98,5 @@
                                    {:transfers transfers})
                                  (when opts
                                    {:opts (assoc opts :request-id in-id)}))})]
-    (if-not (e/in-screen?)
-      (post-in)
-      (if (contains? @s/peers id)
-        (post-in)
-        (on-when (contains? @s/peers id)
-          (post-in))))
+    (post-in)
     (sync/wrap-derefable (merge opts {:id in-id}))))
