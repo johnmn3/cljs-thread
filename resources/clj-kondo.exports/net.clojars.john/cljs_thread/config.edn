@@ -1,5 +1,15 @@
 {:lint-as {cljs-thread.core/=>> clojure.core/->>}
  :hooks {:macroexpand {cljs-thread.core/in cljs-thread.core/in
                        cljs-thread.core/future cljs-thread.core/future
+                       cljs-thread.core/spawn cljs-thread.core/spawn
                        cljs-thread.core/wait cljs-thread.core/wait
-                       cljs-thread.core/in? cljs-thread.core/in?}}}
+                       cljs-thread.core/in? cljs-thread.core/in?}}
+ :config-in-call
+ {cljs-thread.core/in
+  {:linters {:unresolved-symbol {:exclude [yield]}}}
+  cljs-thread.core/future
+  {:linters {:unresolved-symbol {:exclude [yield]}}}
+  cljs-thread.core/wait
+  {:linters {:unresolved-symbol {:exclude [yield]}}}
+  cljs-thread.core/spawn
+  {:linters {:unresolved-symbol {:exclude [yield]}}}}}

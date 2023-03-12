@@ -24,12 +24,9 @@
 
 (defn on-sw-registration [cb else-cb]
   (-> (js/navigator.serviceWorker.getRegistration)
-      (.then #(do (println :in-cb)
-                  (if (.-controller js/navigator.serviceWorker)
-                    (do (println :registrations %)
-                        (cb))
-                    (do (println :no-registration)
-                        (else-cb)))))))
+      (.then #(if (.-controller js/navigator.serviceWorker)
+                (cb)
+                (else-cb)))))
 
 (defn link [id]
   (when-not (-> @s/peers (get-in [id :port]))
