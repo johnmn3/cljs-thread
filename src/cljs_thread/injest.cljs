@@ -6,7 +6,6 @@
    [cljs-thread.state :as s]
    [cljs-thread.spawn :refer [spawn]]
    [cljs-thread.in :refer [in]]
-   [injest.impl]
    [injest.path]))
 
 (defn mk-injest-ids [& [n]]

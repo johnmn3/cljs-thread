@@ -13,3 +13,5 @@ shadow_dashboard/.shadow-cljs
 .lsp/
 .portal
 .vscode
+node_modules/
+.shadow-cljs/
