@@ -34,4 +34,47 @@
   :node-integration
   {:target     :node-script
    :output-to  "target/node-integration/main.js"
-   :main       cljs-thread.node-runner/main}}}
+   :main       cljs-thread.node-runner/main}
+  ;; Strategy 1: Self-Spawn — Node.js integration test
+  :node-strategy-1
+  {:target     :node-script
+   :output-to  "target/node-integration/strategy1.js"
+   :main       cljs-thread.strategy.node-self-spawn-test/main}
+  ;; Strategy 2: Blob Bootstrap — Node.js integration test
+  :node-strategy-2
+  {:target     :node-script
+   :output-to  "target/node-integration/strategy2.js"
+   :main       cljs-thread.strategy.node-blob-bootstrap-test/main}
+  ;; Strategy 3: Eval Kernel — Node.js integration test
+  :node-strategy-3
+  {:target     :node-script
+   :output-to  "target/node-integration/strategy3.js"
+   :main       cljs-thread.strategy.node-eval-kernel-test/main}
+  ;; Browser strategy tests: screen module for strategy tests
+  :strategy-browser
+  {:target     :browser
+   :output-dir "target/strategy-test"
+   :modules    {:shared {:entries []}
+                :screen {:init-fn    cljs-thread.strategy-test-browser/init!
+                         :depends-on #{:shared}}
+                :core   {:init-fn    cljs-thread.integration-core/init!
+                         :depends-on #{:shared}
+                         :web-worker true}}}
+  ;; Service worker for browser strategy tests
+  :strategy-browser-sw
+  {:target     :browser
+   :output-dir "target/strategy-test"
+   :modules    {:sw {:entries [cljs-thread.sw]
+                     :web-worker true}}}
+  ;; Non-code-split browser strategy tests: single module for screen + worker
+  :strategy-nosplit
+  {:target     :browser
+   :output-dir "target/strategy-nosplit-test"
+   :modules    {:app {:init-fn    cljs-thread.strategy-test-browser/init!
+                      :web-worker true}}}
+  ;; Service worker for non-code-split strategy tests
+  :strategy-nosplit-sw
+  {:target     :browser
+   :output-dir "target/strategy-nosplit-test"
+   :modules    {:sw {:entries [cljs-thread.sw]
+                     :web-worker true}}}}}

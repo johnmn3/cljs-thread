@@ -58,13 +58,37 @@
   (and (exists? js/self)
        (not (undefined? (.-document js/self)))))
 
+(defn- resolve-url
+  "Resolve a relative URL path to absolute.
+   In blob workers, js/location.origin is 'null', so we use the
+   __cljs_thread_origin global set by spawn strategies."
+  [path]
+  (if (and (exists? js/globalThis.__cljs_thread_origin)
+           (some? js/globalThis.__cljs_thread_origin))
+    (str js/globalThis.__cljs_thread_origin path)
+    path))
+
 (defn- browser-init-data []
-  (let [loc-search js/location.search]
-    (if-not (seq loc-search)
-      (if (browser-in-screen?)
-        {:id :screen}
-        {:id :root})
-      (u/decode-qp loc-search))))
+  (cond
+    ;; Init data embedded via strategy — blob/eval/kernel workers set
+    ;; globalThis.__cljs_thread_init_data before loading the runtime.
+    ;; Check this FIRST because kernel-URL workers have non-standard
+    ;; query params (d=, s=, o=) that shouldn't be parsed as worker data.
+    (and (exists? js/globalThis)
+         (exists? js/globalThis.__cljs_thread_init_data)
+         (some? js/globalThis.__cljs_thread_init_data))
+    ;; EDN preserves original types — named workers have keyword IDs (:root),
+    ;; ephemeral workers have string IDs. Do NOT convert to keyword here
+    ;; (unlike Node's js->clj path) or sync request-id matching will break.
+    (edn/read-string js/globalThis.__cljs_thread_init_data)
+    ;; Screen (main thread with document) — always :screen
+    (browser-in-screen?)
+    {:id :screen}
+    ;; Standard path: worker created with query params
+    (seq js/location.search)
+    (u/decode-qp js/location.search)
+    ;; Fallback
+    :else {:id :root}))
 
 (defn- browser-request [getter opts env-data]
   (let [{:keys [resolve reject no-park max-time duration]} opts
@@ -73,7 +97,7 @@
     (try
       (let [xhr (js/XMLHttpRequest.)]
         (.open xhr "GET"
-               (str "/intercept/request/key.js" (u/encode-qp req))
+               (resolve-url (str "/intercept/request/key.js" (u/encode-qp req)))
                (if (or (browser-in-screen?) resolve) true false))
         (.setRequestHeader xhr "cache-control" "no-cache, no-store, max-age=0")
         (when resolve
@@ -92,7 +116,7 @@
   (try
     (let [req {:responder (:id env-data)}
           xhr (js/XMLHttpRequest.)]
-      (.open xhr "POST" (str "/intercept/response/key.js" (u/encode-qp req)))
+      (.open xhr "POST" (resolve-url (str "/intercept/response/key.js" (u/encode-qp req))))
       (.setRequestHeader xhr "Content-Type" "text/plain;charset=UTF-8")
       (.setRequestHeader xhr "cache-control" "no-cache, no-store, max-age=0")
       (.send xhr (pr-str payload))
@@ -102,7 +126,7 @@
 
 (defn- browser-sleep [ms]
   (let [xhr (js/XMLHttpRequest.)]
-    (.open xhr "GET" (str "/intercept/sleep/t.js?" ms) false)
+    (.open xhr "GET" (resolve-url (str "/intercept/sleep/t.js?" ms)) false)
     (.setRequestHeader xhr "cache-control" "no-cache, no-store, max-age=0")
     (.send xhr "request")
     nil))
@@ -447,8 +471,16 @@
 (defn in-screen?   []       (-in-screen? (platform)))
 (defn close-self!  []       (-close-self! (platform)))
 
+;; Optional override for create-worker — used by spawn strategies.
+;; Holds a fn [url data on-message] -> Worker, or nil for default behavior.
+;; Strategies set this atom AND store config in s/conf :__spawn-strategy
+;; so child workers can re-install the override from their conf.
+(defonce create-worker-override (atom nil))
+
 (defn create-worker [url data on-message]
-  (-create-worker (platform) url data on-message))
+  (if-let [f @create-worker-override]
+    (f url data on-message)
+    (-create-worker (platform) url data on-message)))
 
 (defn register-coordinator [config cb]
   (-register-coordinator (platform) config cb))

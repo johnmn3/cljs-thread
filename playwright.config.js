@@ -29,5 +29,15 @@ module.exports = defineConfig({
       port: 9091,
       reuseExistingServer: false,
     },
+    {
+      command: "node e2e/serve.js strategy-test",
+      port: 9092,
+      reuseExistingServer: false,
+    },
+    {
+      command: "node e2e/serve.js strategy-nosplit-test",
+      port: 9093,
+      reuseExistingServer: false,
+    },
   ],
 });

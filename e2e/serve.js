@@ -5,7 +5,10 @@ const path = require("path");
 // Determine which test directory to serve based on CLI arg
 const mode = process.argv[2] || "browser-test";
 const DIR = path.join(__dirname, "..", "target", mode);
-const PORT = mode === "integration-test" ? 9091 : 9090;
+const PORT = mode === "integration-test" ? 9091
+  : mode === "strategy-test" ? 9092
+  : mode === "strategy-nosplit-test" ? 9093
+  : 9090;
 
 const MIME = {
   ".html": "text/html",
@@ -31,7 +34,7 @@ const server = http.createServer((req, res) => {
     };
     // Cross-origin isolation headers required for SharedArrayBuffer and
     // Service Worker scope in cljs-thread integration tests.
-    if (mode === "integration-test") {
+    if (mode === "integration-test" || mode === "strategy-test" || mode === "strategy-nosplit-test") {
       headers["Cross-Origin-Opener-Policy"] = "same-origin";
       headers["Cross-Origin-Embedder-Policy"] = "credentialless";
     }

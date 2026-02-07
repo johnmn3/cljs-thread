@@ -68,6 +68,30 @@
                    (swap! s/responses assoc request-id res))))))
   (.respondWith e (js/Promise.resolve (response "done"))))
 
+(defn handle-kernel [e]
+  (let [url (js/URL. (.-url e.request))
+        params (.-searchParams url)
+        init-data (.get params "d")
+        scripts-json (.get params "s")
+        origin (.get params "o")
+        code (str (when init-data
+                    (str "globalThis.__cljs_thread_init_data = "
+                         (js/JSON.stringify init-data) ";\n"))
+                  (when scripts-json
+                    (str "globalThis.__cljs_thread_spawn_scripts = "
+                         scripts-json ";\n"))
+                  (when origin
+                    (str "globalThis.__cljs_thread_origin = "
+                         (js/JSON.stringify origin) ";\n"))
+                  (when scripts-json
+                    (str "importScripts.apply(self, " scripts-json ");\n")))]
+    (.respondWith e
+      (js/Promise.resolve
+        (js/Response. code
+                      #js {"headers"
+                           #js {"content-type" "application/javascript"
+                                "Cache-Control" "no-cache, no-store"}})))))
+
 (defn fetch-response [e]
   (let [url (js/URL. (.-url e.request))
         path (.-pathname url)]
@@ -76,7 +100,9 @@
           (= path "/intercept/request/key.js")
           (handle-request e)
           (= path "/intercept/response/key.js")
-          (handle-respond e))))
+          (handle-respond e)
+          (= path "/cljs-thread-kernel.js")
+          (handle-kernel e))))
 
 (when (e/in-sw?)
 
