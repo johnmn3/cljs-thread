@@ -13,6 +13,9 @@ test("cljs-thread: all 3 strategies — mechanisms + integration", async ({ page
   const consoleMessages = [];
   page.on("console", (msg) => consoleMessages.push(msg.text()));
   page.on("pageerror", (err) => consoleMessages.push(`PAGE ERROR: ${err.message}`));
+  page.on("worker", (worker) => {
+    worker.on("console", (msg) => consoleMessages.push(`[worker ${worker.url().split("/").pop().split("?")[0]}] ${msg.text()}`));
+  });
 
   // 3 strategies x ~30s each + generous buffer
   test.setTimeout(300_000);
@@ -39,9 +42,23 @@ test("cljs-thread: all 3 strategies — mechanisms + integration", async ({ page
 
     const summaryClass = await page.locator("#summary").getAttribute("class");
 
-    const pageErrors = consoleMessages.filter((m) => m.includes("PAGE ERROR"));
-    if (pageErrors.length > 0) {
-      console.log("Page errors:", pageErrors);
+    // Always dump worker console messages for debugging
+    const workerMessages = consoleMessages.filter((m) => m.startsWith("[worker"));
+    if (workerMessages.length > 0) {
+      console.log(`Strategy ${strategy.num} worker console (${workerMessages.length} msgs):`);
+      workerMessages.forEach((m) => console.log("  ", m));
+    } else {
+      console.log(`Strategy ${strategy.num}: no worker console messages captured`);
+    }
+
+    // Also dump all non-worker console messages that look like diagnostics
+    const diagMessages = consoleMessages.filter((m) =>
+      m.includes("ROOT") || m.includes("SPAWN") || m.includes("INIT") ||
+      m.includes("START") || m.includes("ERROR") || m.includes("DO-CALL") ||
+      m.includes("PAGE ERROR"));
+    if (diagMessages.length > 0) {
+      console.log(`Strategy ${strategy.num} diagnostics:`);
+      diagMessages.forEach((m) => console.log("  ", m));
     }
 
     expect(summaryClass).toBe("pass");

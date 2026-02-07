@@ -343,18 +343,24 @@
        {:sw-connect-string   "/sw.js"
         :core-connect-string worker-script})
       (log! "  thread/init! called")
-      ;; Wait for workers to be ready
+      ;; Wait for workers to be ready — need :root, :core, and :future pool
       (let [start (.getTime (js/Date.))
+            peer-log-interval (js/setInterval
+                               #(log! "  [peer-check] t=" (- (.getTime (js/Date.)) start) "ms peers=" (pr-str (set (keys @s/peers))))
+                               2000)
             check-ready
             (fn check-ready []
               (let [elapsed (- (.getTime (js/Date.)) start)
                     peers (set (keys @s/peers))]
                 (cond
-                  (and (contains? peers :root) (contains? peers :core))
-                  (do (log! "Workers ready in" elapsed "ms. Peers:" (pr-str peers))
-                      (js/setTimeout #(run-all-tests! strategy-num) 2000))
+                  (and (contains? peers :root) (contains? peers :core)
+                       (contains? peers :future) (contains? peers :fp-0))
+                  (do (js/clearInterval peer-log-interval)
+                      (log! "Workers ready in" elapsed "ms. Peers:" (pr-str peers))
+                      (js/setTimeout #(run-all-tests! strategy-num) 500))
                   (> elapsed 30000)
-                  (do (log! "TIMEOUT waiting for workers. Peers:" (pr-str peers))
+                  (do (js/clearInterval peer-log-interval)
+                      (log! "TIMEOUT waiting for workers. Peers:" (pr-str peers))
                       (fail! "init:timeout" "workers ready" (pr-str peers))
                       (render-results!))
                   :else

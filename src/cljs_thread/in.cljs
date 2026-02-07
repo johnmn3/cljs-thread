@@ -77,7 +77,7 @@
   [data]
   (do-call data))
 
-(defn do-in [id & [args afn opts]]
+(defn ^:export do-in [id & [args afn opts]]
   (let [[afn args] (if afn [afn args] [args nil])
         in-id (u/gen-id)
         transfer-atom (atom {:count 0 :transfers {}})

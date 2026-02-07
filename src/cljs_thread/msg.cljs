@@ -127,7 +127,7 @@
                     :transfers {1 {:transfer c2}}
                     :id (str id1)}}))
 
-(defn pair-ids [id1 id2]
+(defn ^:export pair-ids [id1 id2]
   (let [[c1 c2] (mk-chan-pair)]
     (dist-port id1 id2 c1 c2)))
 

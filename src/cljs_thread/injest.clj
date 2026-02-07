@@ -5,9 +5,9 @@
    [cljs-thread.macro-impl :as i]))
 
 (defmacro tfan [conveyer names xf-group]
-  (let [yfn `(clojure.core/fn ~names (injest.impl/compose-transducer-group ~xf-group))]
+  (let [yfn `(clojure.core/fn ~names (cljs-thread.injest/compose-xf ~xf-group))]
     `(do (fn [args#]
-           (cljs-thread.injest/fan ~conveyer ~yfn args#)))))
+           (cljs-thread.injest/fan ~conveyer (clojure.core/str ~yfn) args#)))))
 
 (defn pre-transducify-thread [conveyer names env minimum-group-size t-fn t-pred thread]
   (->> thread

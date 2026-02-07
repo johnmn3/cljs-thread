@@ -14,4 +14,4 @@
                  (fn [yield*#]
                    (let [~'yield yield*#]
                      ~@body))))]
-    `(cljs-thread.future/do-future ~conveyer ~afn ~opts)))
+    `(cljs-thread.future/do-future ~conveyer (clojure.core/str ~afn) ~opts)))

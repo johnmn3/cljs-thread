@@ -32,11 +32,14 @@
       ;; Node.js: main thread is both screen and root.
       ;; No SW needed — coordinator is the main thread itself.
       ;; Spawn root, core, db workers directly.
+      ;; NOTE: pair-ids is called inside init-root! (not here) because
+      ;; under advanced compilation with code splitting, non-exported fns
+      ;; referenced in spawn bodies may be placed in screen.js by Closure,
+      ;; making them unavailable when eval'd on workers.
       (sp/spawn-sw
        #(spawn {:id :root :no-globals? true}
                (spawn {:id :core :no-globals? true})
                (spawn {:id :db :no-globals? true})
-               (m/pair-ids :core :db)
                (r/init-root! config)))
       ;; Browser: existing flow
       (if-not (:sw-connect-string config)
@@ -46,7 +49,6 @@
              #(spawn {:id :root :no-globals? true}
                      (spawn {:id :core :no-globals? true})
                      (spawn {:id :db :no-globals? true})
-                     (m/pair-ids :core :db)
                      (r/init-root! config)))
             (when-not (u/in-safari?)
               (sp/on-sw-registration-reload)))))))

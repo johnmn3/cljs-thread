@@ -20,9 +20,21 @@
                  (spawn {:id wid}
                         (s/update-conf! configs)))))))
 
+;; Anchor common core predicates in the shared module so Closure doesn't
+;; move them to screen.js via cross-module code motion.  Functions referenced
+;; only from screen-side code get local names (e.g. lJ) that are unavailable
+;; when eval'd on workers.  Exporting these refs forces $APP.xxx names.
+(def ^:export core-preds
+  {:odd? odd? :even? even? :zero? zero? :pos? pos? :neg? neg?
+   :number? number? :string? string? :keyword? keyword?
+   :int? int? :nil? nil?})
+
+(defn ^:export compose-xf [xfs]
+  (injest.impl/compose-transducer-group xfs))
+
 (def ^:dynamic *par* nil)
 (def ^:dynamic *chunk* nil)
-(defn fan [conveyer xf args & {:keys [par chunk]}]
+(defn ^:export fan [conveyer xf args & {:keys [par chunk]}]
   (let [injest-count (:injest-count @s/conf 4)
         n-pws (or *par* par (* injest-count 8))
         pws (take n-pws (cycle (mk-injest-ids (:injest-count @s/conf))))
@@ -31,8 +43,11 @@
          (map (fn [ags]
                 (->> ags
                      (mapv (fn [p a]
-                             (in p 
-                                 (sequence (apply xf conveyer) a)))
+                             (in p
+                                 (let [xf-fn (if (string? xf)
+                                               (js/eval (str "(function(){return(" xf ");})();"))
+                                               xf)]
+                                   (sequence (apply xf-fn conveyer) a))))
                            pws))))
          (mapcat #(map deref %))
          (apply concat))))

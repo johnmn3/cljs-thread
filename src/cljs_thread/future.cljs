@@ -10,7 +10,7 @@
    [cljs-thread.state :as s]
    [cljs-thread.sync :as sync]))
 
-(defn take-worker! []
+(defn ^:export take-worker! []
   (when-let [p (some->> @s/future-pool :available first)]
     (swap! s/future-pool
            (fn [{:keys [available in-use]}]
@@ -18,7 +18,7 @@
               :in-use (conj in-use p)}))
     p))
 
-(defn put-back-worker! [p]
+(defn ^:export put-back-worker! [p]
   (swap! s/future-pool
          (fn [{:keys [available in-use]}]
            {:available (conj available p)
@@ -29,7 +29,7 @@
   (let [ws (-> n (or (inc (u/num-cores))) (/ 2) int)]
     (->> ws range (map #(keyword (str "fp-" %))))))
 
-(defn init-future! [& [{:as config-map :keys [future-ids]}]]
+(defn ^:export init-future! [& [{:as config-map :keys [future-ids]}]]
   (assert (e/in-future?))
   (when config-map
     (s/update-conf! config-map)
@@ -48,18 +48,19 @@
                  (spawn {:id fid :no-globals? true}
                         (s/update-conf! future-conf)))))))
 
-(defn do-future [args afn opts]
+(defn ^:export do-future [args afn opts]
   (let [fut-id (u/gen-id)]
-    (in :future [args afn fut-id] ;; <- TODO: prevent implicit conveyer param duplication (dissallowed for arraybuffer transfers)
+    (in :future [args afn fut-id]
         (on-when (-> @s/future-pool :available seq) {:duration 5}
           (let [worker (take-worker!)]
             (in worker [args afn fut-id worker]
                 (try
-                  (if (seq args)
-                    ((apply afn args)
-                     #(sync/send-response {:request-id fut-id :response %}))
-                    ((afn)
-                     #(sync/send-response {:request-id fut-id :response %})))
+                  (let [f (js/eval (str "(function(){return(" afn ");})();"))]
+                    (if (seq args)
+                      ((apply f args)
+                       #(sync/send-response {:request-id fut-id :response %}))
+                      ((f)
+                       #(sync/send-response {:request-id fut-id :response %}))))
                   (catch :default e
                     (sync/send-response {:request-id fut-id :response {:error (pr-str e)}})))
                 (in :future
