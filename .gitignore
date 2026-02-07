@@ -12,6 +12,7 @@ shadow_dashboard/resources/public
 shadow_dashboard/.shadow-cljs
 node_modules
 .shadow-cljs
+test-results
 .lsp/
 .portal
 .vscode
