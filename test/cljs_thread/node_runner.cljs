@@ -4,12 +4,15 @@
    and exercises the same features as the browser integration tests.
    Uses Promise-based (.then) pattern since the main thread is also
    the coordinator and cannot block synchronously."
-  (:require-macros [cljs-thread.core :refer [spawn in on-when]])
+  (:require-macros [cljs-thread.core :refer [spawn in on-when future pmap =>>]])
   (:require
    [cljs-thread.core :as thread]
    [cljs-thread.env :as env]
    [cljs-thread.state :as s]
-   [cljs-thread.platform :as p]))
+   [cljs-thread.platform :as p]
+   [cljs-thread.future]
+   [cljs-thread.pmap]
+   [cljs-thread.injest]))
 
 (enable-console-print!)
 
@@ -73,17 +76,59 @@
         (.catch (fn [e]
                   (fail! "spawn-local-conveyance" (str "error: " e)))))))
 
+(defn test-future-basic []
+  (-> @(future (+ 100 200))
+      (.then (fn [result]
+               (check "future-basic" 300 result)))
+      (.catch (fn [e]
+                (fail! "future-basic" (str "error: " e))))))
+
+(defn test-future-nested []
+  (-> @(future (+ 1 @(future (+ 2 3))))
+      (.then (fn [result]
+               (check "future-nested" 6 result)))
+      (.catch (fn [e]
+                (fail! "future-nested" (str "error: " e))))))
+
+(defn test-pmap-basic []
+  (-> @(future
+         (let [result (doall (pmap inc [1 2 3 4]))]
+           result))
+      (.then (fn [result]
+               (check "pmap-basic" [2 3 4 5] (vec result))))
+      (.catch (fn [e]
+                (fail! "pmap-basic" (str "error: " e))))))
+
+(defn test-parallel-transducer []
+  (-> @(=>> (range 10)
+            (map inc)
+            (filter odd?)
+            (apply +))
+      (.then (fn [result]
+               (check "parallel-transducer" 25 result)))
+      (.catch (fn [e]
+                (fail! "parallel-transducer" (str "error: " e))))))
+
 (defn run-tests! []
   (println "Starting Node.js integration tests...")
   (println "Platform:" (if p/node? "node" "browser"))
   (println "Thread ID:" (:id env/data))
 
-  ;; Note: future and pmap tests are deferred — they require MessagePort
-  ;; transfer between worker threads (mesh) which needs further Node.js work.
+  ;; Set a global timeout in case any test hangs
+  (js/setTimeout
+   (fn []
+     (println "\nGLOBAL TIMEOUT: Tests did not complete in 45s")
+     (finish!))
+   45000)
+
   (-> (test-spawn-ephemeral)
       (.then test-spawn-nested)
       (.then test-in-named-worker)
       (.then test-spawn-local-conveyance)
+      (.then test-future-basic)
+      (.then test-future-nested)
+      (.then test-pmap-basic)
+      (.then test-parallel-transducer)
       (.then (fn []
                (println "All integration tests complete.")
                (finish!)))
@@ -111,9 +156,12 @@
       :injest-connect-string worker-path}))
 
   ;; Wait for workers to be ready, then run tests
+  ;; Need :root, :core, and :future + at least one :fp-* for future tests
   (on-when (and (contains? @s/peers :root)
-                (contains? @s/peers :core))
+                (contains? @s/peers :core)
+                (contains? @s/peers :future)
+                (some #(.startsWith (name %) "fp-") (keys @s/peers)))
     {:max-time 30000}
     (println "Workers ready. Peers:" (set (keys @s/peers)))
-    ;; Delay slightly to ensure mesh is set up
-    (js/setTimeout run-tests! 2000)))
+    ;; Delay to ensure mesh and future pool are fully set up
+    (js/setTimeout run-tests! 3000)))

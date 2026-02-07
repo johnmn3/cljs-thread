@@ -34,7 +34,9 @@
   (when config-map
     (s/update-conf! config-map)
     (when future-ids
-      (swap! s/future-pool update :available into future-ids))))
+      ;; Ensure future-ids are keywords — in Node.js, workerData round-trips
+      ;; through clj->js/js->clj which converts keyword values to strings.
+      (swap! s/future-pool update :available into (map keyword future-ids)))))
 
 (defn start-futures [configs]
   (let [future-ids (mk-worker-ids (:future-count configs))
