@@ -7,7 +7,9 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "npx shadow-cljs compile node-test"
+    "test": "npx shadow-cljs compile node-test",
+    "test:browser": "npx shadow-cljs compile browser-test && npx playwright test",
+    "test:all": "npx shadow-cljs compile node-test browser-test && npx playwright test"
   },
   "repository": {
     "type": "git",
@@ -17,6 +19,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "shadow-cljs": "^3.3.5"
   }
 }

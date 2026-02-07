@@ -3,5 +3,9 @@
  {:node-test
   {:target    :node-test
    :output-to "target/node-test/test.js"
-   :ns-regexp "-test$"
-   :autorun   true}}}
+   :ns-regexp "\\.(util|id|macro-impl)-test$"
+   :autorun   true}
+  :browser-test
+  {:target    :browser-test
+   :test-dir  "target/browser-test"
+   :ns-regexp "-test$"}}}
