@@ -49,5 +49,10 @@ module.exports = defineConfig({
       port: 9095,
       reuseExistingServer: false,
     },
+    {
+      command: "node e2e/serve.js autoload-test",
+      port: 9096,
+      reuseExistingServer: false,
+    },
   ],
 });

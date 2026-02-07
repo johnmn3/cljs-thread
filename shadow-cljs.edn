@@ -97,6 +97,24 @@
    :output-dir "target/usability-test"
    :modules    {:sw {:entries [cljs-thread.sw]
                      :web-worker true}}}
+  ;; Autoload tests: catch-and-load proof of concept
+  ;; NOTE: autoload-fns is NOT in :shared — it will end up in screen.js
+  ;; with IIFE-local names. The catch-and-load mechanism handles this.
+  :autoload-browser
+  {:target     :browser
+   :output-dir "target/autoload-test"
+   :modules    {:shared {:entries []}
+                :screen {:init-fn    cljs-thread.autoload-test-browser/init!
+                         :depends-on #{:shared}}
+                :core   {:init-fn    cljs-thread.integration-core/init!
+                         :depends-on #{:shared}
+                         :web-worker true}}}
+  ;; Service worker for autoload tests
+  :autoload-browser-sw
+  {:target     :browser
+   :output-dir "target/autoload-test"
+   :modules    {:sw {:entries [cljs-thread.sw]
+                     :web-worker true}}}
   ;; Usability tests: non-code-split browser build
   :usability-nosplit
   {:target     :browser
