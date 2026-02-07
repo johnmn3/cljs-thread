@@ -2,6 +2,7 @@
   (:require
    [cljs-thread.state :as s]
    [cljs-thread.env :as e]
+   [cljs-thread.platform :as p]
    [cljs-thread.id :refer [IDable get-id]]
    [clojure.edn :as edn]
    [clojure.pprint :refer [pprint]]))
@@ -16,18 +17,26 @@
     (str id)))
 
 (defn message-handler [^js e]
-  (let [data (.-msg (.-data e))
-        receive-port? (-> ^js data .-dispatch (= "receive-port"))
-        data (if receive-port?
-               (-> data (js->clj :keywordize-keys true)
-                   (update :dispatch keyword)
-                   (update-in [:data :id] read-id))
-               (-> data edn/read-string))]
-    (dispatch data)))
+  (let [raw (if p/node? e (.-data e))]
+    ;; In Node, sync-protocol messages (register-sync, send-sync-response, etc.)
+    ;; arrive on the same handler. Ignore anything without a .msg property.
+    (when-let [data (.-msg raw)]
+      (let [receive-port? (-> ^js data .-dispatch (= "receive-port"))
+            data (if receive-port?
+                   (-> data (js->clj :keywordize-keys true)
+                       (update :dispatch keyword)
+                       (update-in [:data :id] read-id))
+                   (-> data edn/read-string))]
+        (dispatch data)))))
 
-(if (not (e/in-screen?))
-  (.addEventListener js/self event-message message-handler)
-  (.addEventListener js/window event-message message-handler))
+;; Register the message handler on the current thread's self-ref.
+;; In browser: addEventListener on js/self or js/window.
+;; In Node: .on('message') on parentPort (for workers) or no-op for main.
+(let [target (if (e/in-screen?)
+               (when-not p/node? (p/self-ref))
+               (p/self-ref))]
+  (when target
+    (p/listen target message-handler)))
 
 (defn do-pprint [s]
   (pprint s))
@@ -39,7 +48,9 @@
 (defmethod dispatch :receive-port
   [{{:keys [id port]} :data}]
   (swap! s/peers assoc-in [id :port] port)
-  (set! (.-onmessage port) message-handler))
+  (if p/node?
+    (p/listen port message-handler)
+    (set! (.-onmessage port) message-handler)))
 
 (defn when-peer-ready [id afn & [watch-key]]
   (let [watch-key (or watch-key (str id "-" (hash afn) "-" (gensym)))]
@@ -50,6 +61,13 @@
        watch-key
        #(do (remove-watch s/peers watch-key)
             (when-peer-ready id afn watch-key))))))
+
+(defn- do-post-message [w data transfers transferables]
+  (let [msg (if (-> data :dispatch (= :receive-port))
+              #js {:transfers transfers :msg (clj->js data)}
+              #js {:transfers transfers :msg (str data)})
+        xfers (if transferables (clj->js transferables) #js [])]
+    (p/post-message w msg xfers)))
 
 (defn post [worker-id {:as data {:keys [transfers]} :data} & [transferables]]
   (let [transferables (->> transfers (mapv (fn [[_k {:keys [transfer]}]]
@@ -67,27 +85,13 @@
           (if (and (not (e/in-screen?)) (not w))
             (let [w (or (-> @s/peers (get-in [:parent :port]))
                         (-> @s/peers (get-in [:parent :w])))]
-              (.postMessage w
-                            #js {:transfers transfers
-                                 :msg
-                                 ((if (-> data :dispatch (= :receive-port)) clj->js pr-str)
-                                  {:dispatch :proxy
-                                   :data data})}
-                            (if transferables
-                              (clj->js transferables)
-                              #js [])))
+              (do-post-message w
+                               {:dispatch :proxy :data data}
+                               transfers transferables))
             (when-peer-ready id
                              #(let [w (or (-> @s/peers (get-in [id :port]))
                                           (-> @s/peers (get-in [id :w])))]
-                                (.postMessage w
-                                              (if (-> data :dispatch (= :receive-port))
-                                                #js {:transfers transfers
-                                                     :msg (clj->js data)}
-                                                #js {:transfers transfers
-                                                     :msg (str data)})
-                                              (if transferables
-                                                (clj->js transferables)
-                                                #js [])))))
+                                (do-post-message w data transfers transferables))))
           (catch :default e
             (println :id (:id e/data))
             (println :e e)
@@ -105,10 +109,7 @@
       (post id data))))
 
 (defn mk-chan-pair []
-  (let [c (js/MessageChannel.)
-        c1 (.-port1 c)
-        c2 (.-port2 c)]
-    [c1 c2]))
+  (p/mk-channel))
 
 (defn send-port [id c1]
   (post id {:dispatch :receive-port
@@ -132,4 +133,6 @@
 
 (defn add-port [id p]
   (swap! s/peers assoc-in [id :port] p)
-  (set! (.-onmessage p) message-handler))
+  (if p/node?
+    (p/listen p message-handler)
+    (set! (.-onmessage p) message-handler)))

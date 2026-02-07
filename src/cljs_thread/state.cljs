@@ -1,6 +1,7 @@
 (ns cljs-thread.state
   (:require
-   [cljs-thread.env :as e]))
+   [cljs-thread.env :as e]
+   [cljs-thread.platform :as p]))
 
 (defn shake
   [atm & {:keys [seconds msg limit effect]
@@ -35,10 +36,11 @@
 (def local-val (atom nil))
 
 (when-not (e/in-screen?)
-  (swap! peers assoc :parent {:id :parent :w js/self :port js/self})
-  (if (e/in-root?)
-    (swap! peers assoc :screen {:id :screen :w js/self :port js/self})
-    (swap! peers assoc :root {:id :root :w js/self :port js/self})))
+  (let [self (p/self-ref)]
+    (swap! peers assoc :parent {:id :parent :w self :port self})
+    (if (e/in-root?)
+      (swap! peers assoc :screen {:id :screen :w self :port self})
+      (swap! peers assoc :root {:id :root :w self :port self}))))
 
 (def responses
   (atom {}))

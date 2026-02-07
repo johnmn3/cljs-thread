@@ -4,6 +4,7 @@
    [cljs-thread.util :as u]
    [cljs-thread.env :as e]
    [cljs-thread.state :as s]
+   [cljs-thread.platform :as p]
    [cljs-thread.spawn :as sp]
    [cljs-thread.on-when]
    [cljs-thread.in]
@@ -27,17 +28,28 @@
   (when config-map
     (swap! s/conf merge config-map))
   (let [config @s/conf]
-    (if-not (:sw-connect-string config)
-      (spawn {:id :root :no-globals? true}
-             (r/init-root! config))
-      (do (sp/spawn-sw
-           #(spawn {:id :root :no-globals? true}
-                   (spawn {:id :core :no-globals? true})
-                   (spawn {:id :db :no-globals? true})
-                   (m/pair-ids :core :db)
-                   (r/init-root! config)))
-          (when-not (u/in-safari?)
-            (sp/on-sw-registration-reload))))))
+    (if p/node?
+      ;; Node.js: main thread is both screen and root.
+      ;; No SW needed — coordinator is the main thread itself.
+      ;; Spawn root, core, db workers directly.
+      (sp/spawn-sw
+       #(spawn {:id :root :no-globals? true}
+               (spawn {:id :core :no-globals? true})
+               (spawn {:id :db :no-globals? true})
+               (m/pair-ids :core :db)
+               (r/init-root! config)))
+      ;; Browser: existing flow
+      (if-not (:sw-connect-string config)
+        (spawn {:id :root :no-globals? true}
+               (r/init-root! config))
+        (do (sp/spawn-sw
+             #(spawn {:id :root :no-globals? true}
+                     (spawn {:id :core :no-globals? true})
+                     (spawn {:id :db :no-globals? true})
+                     (m/pair-ids :core :db)
+                     (r/init-root! config)))
+            (when-not (u/in-safari?)
+              (sp/on-sw-registration-reload)))))))
 
 ;; ephemeral spawns
 (when (and (not (e/in-sw?)) (not (e/in-screen?)))
@@ -50,5 +62,5 @@
                       :in-id (:in-id e/data)
                       :opts {:request-id (:id e/data) :atom? true :yield? (:yield? e/data)}}}))
   (when (and (not (:yield? e/data)) (not (:deamon? e/data)))
-    (.close js/self))
+    (p/close-self!))
   :end)

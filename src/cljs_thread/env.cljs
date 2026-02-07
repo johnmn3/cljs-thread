@@ -1,16 +1,11 @@
 (ns cljs-thread.env
   (:require
+   [cljs-thread.platform :as p]
    [cljs-thread.util :as u]))
 
-(defn in-screen? [] (-> js/self .-document undefined? not))
+(defn in-screen? [] (p/in-screen?))
 
-(def data
-  (let [loc-search js/location.search]
-    (if-not (seq loc-search)
-      (if (in-screen?)
-        {:id :screen}
-        {:id :root})
-      (u/decode-qp loc-search))))
+(def data (p/init-data))
 
 (defn in-root? []
   (-> data :id (= :root)))

@@ -24,4 +24,14 @@
                          :depends-on #{:shared}}
                 :core   {:init-fn    cljs-thread.integration-core/init!
                          :depends-on #{:shared}
-                         :web-worker true}}}}}
+                         :web-worker true}}}
+  ;; Node.js worker entry point (loaded by worker_threads)
+  :node-worker
+  {:target     :node-script
+   :output-to  "target/node-integration/worker.js"
+   :main       cljs-thread.node-worker-entry/main}
+  ;; Node.js integration test runner (main thread)
+  :node-integration
+  {:target     :node-script
+   :output-to  "target/node-integration/main.js"
+   :main       cljs-thread.node-runner/main}}}

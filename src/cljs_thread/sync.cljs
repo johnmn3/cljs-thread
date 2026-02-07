@@ -4,11 +4,16 @@
    [cljs-thread.util :as u]
    [cljs-thread.env :as e]
    [cljs-thread.state :as s]
+   [cljs-thread.platform :as p]
    [cljs-thread.id :refer [IDable get-id]]
    [clojure.edn :as edn]))
 
 (defn no-blocking? []
-  (not (contains? @s/conf :sw-connect-string)))
+  (if p/node?
+    ;; Node: blocking is always available (Atomics.wait)
+    false
+    ;; Browser: need a service worker for blocking
+    (not (contains? @s/conf :sw-connect-string))))
 
 (defn throw-if-non-blocking []
   (when (no-blocking?)
@@ -22,44 +27,16 @@
 
 (defn request [getter & {:as opts :keys [resolve reject no-park max-time duration]}]
   (throw-if-non-blocking)
-  (let [req {:request-id getter :requester (:id e/data) :no-park no-park :max-time max-time :duration duration}
-        do-request (fn []
-                     (try
-                       (let [xhr (js/XMLHttpRequest.)]
-                         (.open xhr "GET"
-                                (str "/intercept/request/key.js" (u/encode-qp req))
-                                (if (or (e/in-screen?) resolve) true false))
-                         (.setRequestHeader xhr "cache-control" "no-cache, no-store, max-age=0")
-                         (when resolve
-                           (set! (.-onload xhr) #(resolve (edn/read-string (.-response xhr)))))
-                         (when reject
-                           (set! (.-onerror xhr) #(reject (.-status xhr))))
-                         (.send xhr)
-                         (if resolve
-                           xhr
-                           (let [res (edn/read-string (.-responseText xhr))]
-                             res)))
-                       (catch :default e
-                         (when-not (= :repl-sync (:id e/data))
-                           (println :error :requesting-response :e e)))))]
-    (when (or (not (= getter :sw)) (not (e/in-screen?)) (.-controller js/navigator.serviceWorker))
-      (do-request))))
+  (if p/node?
+    ;; Node: dispatch through platform
+    (p/request getter opts)
+    ;; Browser: check SW is ready, then dispatch through platform
+    (when (or (not (= getter :sw)) (not (e/in-screen?)) (p/coordinator-ready?))
+      (p/request getter opts))))
 
 (defn send-response [payload & [db?]]
   (throw-if-non-blocking)
-  (try
-    (let [req (if db?
-                {:responder (:id e/data) :db? db?}
-                {:responder (:id e/data)})
-          xhr (js/XMLHttpRequest.)]
-      (.open xhr "POST" (str "/intercept/response/key.js" (u/encode-qp req)))
-      (.setRequestHeader xhr "Content-Type" "text/plain;charset=UTF-8")
-      (.setRequestHeader xhr "cache-control" "no-cache, no-store, max-age=0")
-      (.send xhr (pr-str payload))
-      (.-responseText xhr)
-      nil)
-    (catch :default e
-      (println :error :sending-response :e e))))
+  (p/send-response payload))
 
 (extend-type js/Promise
   ICloneable
@@ -124,9 +101,4 @@
 
 (defn sleep [n]
   (throw-if-non-blocking)
-  (let [xhr (js/XMLHttpRequest.)]
-    (.open xhr "GET" (str "/intercept/sleep/t.js?" n) false)
-    (.setRequestHeader xhr "cache-control" "no-cache, no-store, max-age=0")
-    (.send xhr "request")
-    (.-responseText xhr))
-  nil)
+  (p/sleep n))
