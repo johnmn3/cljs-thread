@@ -2,8 +2,10 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
-const DIR = path.join(__dirname, "..", "target", "browser-test");
-const PORT = 9090;
+// Determine which test directory to serve based on CLI arg
+const mode = process.argv[2] || "browser-test";
+const DIR = path.join(__dirname, "..", "target", mode);
+const PORT = mode === "integration-test" ? 9091 : 9090;
 
 const MIME = {
   ".html": "text/html",
@@ -14,7 +16,9 @@ const MIME = {
 };
 
 const server = http.createServer((req, res) => {
-  const filePath = path.join(DIR, req.url === "/" ? "index.html" : req.url);
+  // Strip query string for file lookup
+  const urlPath = req.url.split("?")[0];
+  const filePath = path.join(DIR, urlPath === "/" ? "index.html" : urlPath);
   const ext = path.extname(filePath);
   fs.readFile(filePath, (err, data) => {
     if (err) {
@@ -22,11 +26,20 @@ const server = http.createServer((req, res) => {
       res.end("Not found");
       return;
     }
-    res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream" });
+    const headers = {
+      "Content-Type": MIME[ext] || "application/octet-stream",
+    };
+    // Cross-origin isolation headers required for SharedArrayBuffer and
+    // Service Worker scope in cljs-thread integration tests.
+    if (mode === "integration-test") {
+      headers["Cross-Origin-Opener-Policy"] = "same-origin";
+      headers["Cross-Origin-Embedder-Policy"] = "credentialless";
+    }
+    res.writeHead(200, headers);
     res.end(data);
   });
 });
 
 server.listen(PORT, () => {
-  console.log(`Serving browser-test on http://localhost:${PORT}`);
+  console.log(`Serving ${mode} on http://localhost:${PORT}`);
 });

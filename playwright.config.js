@@ -3,7 +3,7 @@ const { defineConfig } = require("@playwright/test");
 
 module.exports = defineConfig({
   testDir: "./e2e",
-  timeout: 60_000,
+  timeout: 120_000,
   retries: 0,
   use: {
     browserName: "chromium",
@@ -18,9 +18,16 @@ module.exports = defineConfig({
       ],
     },
   },
-  webServer: {
-    command: "node e2e/serve.js",
-    port: 9090,
-    reuseExistingServer: false,
-  },
+  webServer: [
+    {
+      command: "node e2e/serve.js browser-test",
+      port: 9090,
+      reuseExistingServer: false,
+    },
+    {
+      command: "node e2e/serve.js integration-test",
+      port: 9091,
+      reuseExistingServer: false,
+    },
+  ],
 });

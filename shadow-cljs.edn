@@ -8,4 +8,20 @@
   :browser-test
   {:target    :browser-test
    :test-dir  "target/browser-test"
-   :ns-regexp "-test$"}}}
+   :ns-regexp "-test$"}
+  ;; Service worker for integration tests (must be served from root)
+  :integration-sw
+  {:target     :browser
+   :output-dir "target/integration-test"
+   :modules    {:sw {:entries [cljs-thread.sw]
+                     :web-worker true}}}
+  ;; Integration tests: screen (main thread) + core (web worker)
+  :integration
+  {:target     :browser
+   :output-dir "target/integration-test"
+   :modules    {:shared {:entries []}
+                :screen {:init-fn    cljs-thread.integration-runner/init!
+                         :depends-on #{:shared}}
+                :core   {:init-fn    cljs-thread.integration-core/init!
+                         :depends-on #{:shared}
+                         :web-worker true}}}}}

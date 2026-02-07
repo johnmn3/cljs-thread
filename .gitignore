@@ -6,6 +6,7 @@
 /out
 .nrep-port
 target
+!target/integration-test/index.html
 shadow_dashboard/node_modules
 shadow_dashboard/resources/public
 !shadow_dashboard/resources/public/index.html
