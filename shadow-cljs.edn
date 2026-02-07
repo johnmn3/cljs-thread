@@ -77,4 +77,35 @@
   {:target     :browser
    :output-dir "target/strategy-nosplit-test"
    :modules    {:sw {:entries [cljs-thread.sw]
+                     :web-worker true}}}
+  ;; Usability tests: code-split browser build
+  ;; NOTE: usability-helpers is in :shared so that ^:export fns get $APP.xxx
+  ;; names accessible from workers. If it were only in :screen, Closure would
+  ;; use module-local aliases (e.g. cK) even for exported fns.
+  :usability-browser
+  {:target     :browser
+   :output-dir "target/usability-test"
+   :modules    {:shared {:entries [cljs-thread.usability-helpers]}
+                :screen {:init-fn    cljs-thread.usability-test-browser/init!
+                         :depends-on #{:shared}}
+                :core   {:init-fn    cljs-thread.integration-core/init!
+                         :depends-on #{:shared}
+                         :web-worker true}}}
+  ;; Service worker for usability tests
+  :usability-browser-sw
+  {:target     :browser
+   :output-dir "target/usability-test"
+   :modules    {:sw {:entries [cljs-thread.sw]
+                     :web-worker true}}}
+  ;; Usability tests: non-code-split browser build
+  :usability-nosplit
+  {:target     :browser
+   :output-dir "target/usability-nosplit-test"
+   :modules    {:app {:init-fn    cljs-thread.usability-test-browser/init!
+                      :web-worker true}}}
+  ;; Service worker for usability non-code-split tests
+  :usability-nosplit-sw
+  {:target     :browser
+   :output-dir "target/usability-nosplit-test"
+   :modules    {:sw {:entries [cljs-thread.sw]
                      :web-worker true}}}}}

@@ -39,5 +39,15 @@ module.exports = defineConfig({
       port: 9093,
       reuseExistingServer: false,
     },
+    {
+      command: "node e2e/serve.js usability-test",
+      port: 9094,
+      reuseExistingServer: false,
+    },
+    {
+      command: "node e2e/serve.js usability-nosplit-test",
+      port: 9095,
+      reuseExistingServer: false,
+    },
   ],
 });
