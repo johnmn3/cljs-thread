@@ -1,0 +1,22 @@
+{
+  "name": "cljs-thread",
+  "version": "1.0.0",
+  "description": "`cljs-thread` makes using webworkers take less... work. Eventually, I'd like it to be able to minimize the amount of build tool configuration it takes to spawn workers in Clojurescript too, but that's a longer term goal.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "npx shadow-cljs compile node-test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://local_proxy@127.0.0.1:37706/git/johnmn3/cljs-thread"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "shadow-cljs": "^3.3.5"
+  }
+}

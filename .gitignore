@@ -10,6 +10,8 @@ shadow_dashboard/node_modules
 shadow_dashboard/resources/public
 !shadow_dashboard/resources/public/index.html
 shadow_dashboard/.shadow-cljs
+node_modules
+.shadow-cljs
 .lsp/
 .portal
 .vscode
