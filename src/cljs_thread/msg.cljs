@@ -4,8 +4,7 @@
    [cljs-thread.env :as e]
    [cljs-thread.platform :as p]
    [cljs-thread.id :refer [IDable get-id]]
-   [clojure.edn :as edn]
-   [clojure.pprint :refer [pprint]]))
+   [clojure.edn :as edn]))
 
 (def event-message "message")
 
@@ -39,7 +38,7 @@
     (p/listen target message-handler)))
 
 (defn do-pprint [s]
-  (pprint s))
+  (println (pr-str s)))
 
 (defmethod dispatch :pprint
   [{:keys [data]}]

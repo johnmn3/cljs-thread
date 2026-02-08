@@ -5,9 +5,7 @@
    [cljs-thread.util :as u]
    [cljs-thread.state :as s]
    [cljs-thread.spawn :refer [spawn]]
-   [cljs-thread.in :refer [in]]
-   [injest.impl]
-   [injest.path]))
+   [cljs-thread.in :refer [in]]))
 
 (defn mk-injest-ids [& [n]]
   (let [ws (-> n (or (inc (u/num-cores))) (/ 2) int)]
@@ -30,7 +28,13 @@
    :int? int? :nil? nil?})
 
 (defn ^:export compose-xf [xfs]
-  (injest.impl/compose-transducer-group xfs))
+  (->> xfs
+       (map #(if-not (coll? %)
+               %
+               (if (= 1 (count %))
+                 (first %)
+                 (apply (first %) (rest %)))))
+       (apply comp)))
 
 (def ^:dynamic *par* nil)
 (def ^:dynamic *chunk* nil)
