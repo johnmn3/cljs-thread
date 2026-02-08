@@ -42,15 +42,17 @@
                (spawn {:id :db :no-globals? true})
                (r/init-root! config)))
       ;; Browser: existing flow
-      (if-not (:sw-connect-string config)
+      (if-not (or (:sw-connect-string config) p/sab-sync?)
+        ;; No sync mechanism — basic spawn only (no blocking support)
         (spawn {:id :root :no-globals? true}
                (r/init-root! config))
+        ;; Full spawn with coordinator (SW or SAB)
         (do (sp/spawn-sw
              #(spawn {:id :root :no-globals? true}
                      (spawn {:id :core :no-globals? true})
                      (spawn {:id :db :no-globals? true})
                      (r/init-root! config)))
-            (when-not (u/in-safari?)
+            (when (and (not p/sab-sync?) (not (u/in-safari?)))
               (sp/on-sw-registration-reload)))))))
 
 ;; ephemeral spawns

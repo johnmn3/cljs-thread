@@ -12,6 +12,7 @@ const PORT = mode === "integration-test" ? 9091
   : mode === "usability-nosplit-test" ? 9095
   : mode === "autoload-test" ? 9096
   : mode === "live-kernel-test" ? 9097
+  : mode === "sab-sync-test" ? 9098
   : 9090;
 
 const MIME = {
@@ -38,7 +39,7 @@ const server = http.createServer((req, res) => {
     };
     // Cross-origin isolation headers required for SharedArrayBuffer and
     // Service Worker scope in cljs-thread integration tests.
-    if (mode === "integration-test" || mode === "strategy-test" || mode === "strategy-nosplit-test" || mode === "usability-test" || mode === "usability-nosplit-test" || mode === "autoload-test" || mode === "live-kernel-test") {
+    if (mode === "integration-test" || mode === "strategy-test" || mode === "strategy-nosplit-test" || mode === "usability-test" || mode === "usability-nosplit-test" || mode === "autoload-test" || mode === "live-kernel-test" || mode === "sab-sync-test") {
       headers["Cross-Origin-Opener-Policy"] = "same-origin";
       headers["Cross-Origin-Embedder-Policy"] = "credentialless";
     }

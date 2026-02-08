@@ -9,16 +9,20 @@
    [clojure.edn :as edn]))
 
 (defn no-blocking? []
-  (if p/node?
+  (cond
     ;; Node: blocking is always available (Atomics.wait)
-    false
-    ;; Browser: need a service worker for blocking
-    (not (contains? @s/conf :sw-connect-string))))
+    p/node? false
+    ;; Browser SAB sync: blocking is available (Atomics.wait in workers)
+    p/sab-sync? false
+    ;; Browser legacy: need a service worker for blocking
+    :else (not (contains? @s/conf :sw-connect-string))))
 
 (defn throw-if-non-blocking []
   (when (no-blocking?)
-    (throw (ex-info (str "Can't deref without a service worker.\n"
-                         "Try adding a `:sw-connect-string \"sw.js\"` to your `init! config\n"
+    (throw (ex-info (str "Can't deref without a sync mechanism.\n"
+                         "Either:\n"
+                         "  1. Set COOP/COEP headers for SharedArrayBuffer support, or\n"
+                         "  2. Add `:sw-connect-string \"sw.js\"` to your init! config\n"
                          "Something like:\n"
                          " `(cljs-thread.core/init! {:sw-connect-string \"sw.js\"\n"
                          "                      :connect-string \"/core.js\"})")
@@ -27,10 +31,10 @@
 
 (defn request [getter & {:as opts :keys [resolve reject no-park max-time duration]}]
   (throw-if-non-blocking)
-  (if p/node?
-    ;; Node: dispatch through platform
+  (if (or p/node? p/sab-sync?)
+    ;; Node or SAB sync: dispatch through platform directly
     (p/request getter opts)
-    ;; Browser: check SW is ready, then dispatch through platform
+    ;; Browser legacy: check SW is ready, then dispatch through platform
     (when (or (not (= getter :sw)) (not (e/in-screen?)) (p/coordinator-ready?))
       (p/request getter opts))))
 

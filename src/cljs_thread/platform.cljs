@@ -25,6 +25,14 @@
   (when node?
     (try (js* "require('worker_threads')") (catch :default _ nil))))
 
+(def sab-sync?
+  "True when SAB-based sync is available in the browser.
+   Requires cross-origin isolation (COOP/COEP headers).
+   When true, browser workers block via Atomics.wait instead of XHR+SW."
+  (and (not node?)
+       (exists? js/SharedArrayBuffer)
+       (exists? js/Atomics)))
+
 ;; ---------------------------------------------------------------------------
 ;; Protocols
 ;; ---------------------------------------------------------------------------
@@ -147,6 +155,12 @@
                 (cb)
                 (else-cb)))))
 
+;; Forward declarations for SAB sync functions (defined after coordinator code)
+(declare browser-sab-request)
+(declare browser-sab-send-response)
+(declare sab-sleep)
+(declare install-browser-sync-handler!)
+
 (defrecord BrowserPlatform [env-data-cache]
   IEnv
   (-init-data [_]
@@ -167,22 +181,34 @@
       (set! (.-onmessage w) on-message)
       w))
   (-register-coordinator [_ config callback]
-    (let [sw-url (str (:sw-connect-string config "/sw.js")
-                      (u/encode-qp {:id :sw}))]
-      (on-sw-registration
-       callback
-       #(-> (js/navigator.serviceWorker.register sw-url)
-            (after-sw-registration (fn [_] (callback)))))))
+    (if sab-sync?
+      ;; SAB mode: main thread IS the coordinator, ready immediately
+      (callback)
+      ;; Legacy SW mode
+      (let [sw-url (str (:sw-connect-string config "/sw.js")
+                        (u/encode-qp {:id :sw}))]
+        (on-sw-registration
+         callback
+         #(-> (js/navigator.serviceWorker.register sw-url)
+              (after-sw-registration (fn [_] (callback))))))))
   (-coordinator-ready? [_]
-    (boolean (.-controller js/navigator.serviceWorker)))
+    (if sab-sync?
+      true
+      (boolean (.-controller js/navigator.serviceWorker))))
 
   ISync
   (-request [this getter opts]
-    (browser-request getter opts (-init-data this)))
+    (if sab-sync?
+      (browser-sab-request getter opts (-init-data this))
+      (browser-request getter opts (-init-data this))))
   (-send-response [this payload]
-    (browser-send-response payload (-init-data this)))
+    (if sab-sync?
+      (browser-sab-send-response payload (-init-data this))
+      (browser-send-response payload (-init-data this))))
   (-sleep [_ ms]
-    (browser-sleep ms))
+    (if sab-sync?
+      (sab-sleep ms)
+      (browser-sleep ms)))
 
   IMsg
   (-listen [_ target handler]
@@ -398,6 +424,124 @@
                    ;; Relay to parent — message bubbles up to coordinator
                    (.postMessage parent-port msg)))))))))
 
+;; ---------------------------------------------------------------------------
+;; Browser SAB Sync
+;;
+;; When COOP/COEP headers enable SharedArrayBuffer in the browser, workers
+;; block via Atomics.wait instead of sync XHR + Service Worker. The main
+;; thread acts as coordinator (same role as Node main thread), using
+;; coordinator-pending to match requests with responses.
+;;
+;; Message routing mirrors Node's parentPort model:
+;;   Worker → parent: self.postMessage(msg)
+;;   Parent → worker: worker.postMessage(msg)
+;;   Grandchild relay: child's addEventListener relays up via self.postMessage
+;; ---------------------------------------------------------------------------
+
+(defn- browser-sab-request
+  "SAB-based sync request for browser workers.
+   Async path: register in coordinator-pending (screen) or post to parent (worker).
+   Sync path: create per-request SABs, post to parent, block with Atomics.wait."
+  [getter opts env-data]
+  (let [{:keys [resolve reject]} opts
+        request-id (normalize-req-id (str getter))]
+    (if resolve
+      ;; Async path
+      (if (browser-in-screen?)
+        ;; Main thread IS the coordinator — register directly
+        (do
+          (swap! coordinator-pending assoc request-id
+                 {:async? true :resolve-fn resolve})
+          nil)
+        ;; Worker thread: post request to coordinator via self.postMessage
+        (do
+          (let [handler (fn handler [^js e]
+                          (let [msg (.-data e)
+                                d (when (object? msg)
+                                    (js->clj msg :keywordize-keys true))]
+                            (when (and d
+                                       (= (:type d) "sync-response")
+                                       (= (:requestId d) request-id))
+                              (.removeEventListener js/self "message" handler)
+                              (resolve (edn/read-string (:payload d))))))]
+            (.addEventListener js/self "message" handler))
+          (js/self.postMessage
+           #js {:type "register-sync"
+                :requestId request-id
+                :requester (str (:id env-data))
+                :async true})
+          nil))
+      ;; Sync path: block with Atomics.wait (worker threads only)
+      (let [signal-sab (js/SharedArrayBuffer. 8)
+            data-sab (js/SharedArrayBuffer. node-data-buffer-size)
+            signal-i32 (js/Int32Array. signal-sab)]
+        (js/self.postMessage
+         #js {:type "register-sync"
+              :requestId request-id
+              :requester (str (:id env-data))
+              :signalSab signal-sab
+              :dataSab data-sab})
+        ;; Block until coordinator signals
+        (js/Atomics.wait signal-i32 0 0)
+        ;; Read response: length from signal-sab[1], bytes from data-sab
+        ;; Browser TextDecoder refuses SharedArrayBuffer views, so copy first
+        (let [data-len (aget signal-i32 1)
+              shared-u8 (js/Uint8Array. data-sab 0 data-len)
+              data-u8 (js/Uint8Array. data-len)
+              _ (.set data-u8 shared-u8)
+              decoder (js/TextDecoder.)
+              edn-str (.decode decoder data-u8)]
+          (edn/read-string edn-str))))))
+
+(defn- browser-sab-send-response
+  "SAB-based send-response for browser.
+   Screen: dispatch directly to coordinator logic.
+   Worker: post to parent via self.postMessage."
+  [payload env-data]
+  (if (browser-in-screen?)
+    ;; Main thread IS the coordinator — process the response directly
+    (node-coordinator-handle-message
+     nil
+     #js {:type "send-sync-response"
+          :payload (pr-str payload)})
+    ;; Worker: send to parent via self.postMessage
+    (js/self.postMessage
+     #js {:type "send-sync-response"
+          :payload (pr-str payload)}))
+  nil)
+
+(defn- sab-sleep
+  "Thread sleep using Atomics.wait with timeout. Works in both browser
+   workers and Node worker_threads."
+  [ms]
+  (let [sab (js/SharedArrayBuffer. 4)
+        i32 (js/Int32Array. sab)]
+    (js/Atomics.wait i32 0 0 ms)
+    nil))
+
+(defn install-browser-sync-handler!
+  "Add a sync protocol message listener on a browser worker.
+   On screen (main thread): acts as coordinator (matches requests/responses).
+   On non-screen workers: relays sync messages up to parent.
+
+   Uses addEventListener so it coexists with the regular onmessage handler.
+   The regular message-handler (msg.cljs) ignores sync protocol messages
+   because they have 'type' instead of 'msg', so there's no conflict."
+  [worker]
+  (when sab-sync?
+    (.addEventListener worker "message"
+      (fn [^js e]
+        (let [msg (.-data e)
+              t (and (object? msg) (aget msg "type"))]
+          (when (or (= t "register-sync")
+                    (= t "send-sync-response")
+                    (= t "relay-sync"))
+            (if (browser-in-screen?)
+              ;; Main thread: act as coordinator
+              (node-coordinator-handle-message worker msg)
+              ;; Non-screen: relay to parent
+              (js/self.postMessage msg))))))))
+
 (defrecord NodePlatform [env-data-cache]
   IEnv
   (-init-data [_]
@@ -478,9 +622,13 @@
 (defonce create-worker-override (atom nil))
 
 (defn create-worker [url data on-message]
-  (if-let [f @create-worker-override]
-    (f url data on-message)
-    (-create-worker (platform) url data on-message)))
+  (let [w (if-let [f @create-worker-override]
+            (f url data on-message)
+            (-create-worker (platform) url data on-message))]
+    ;; Browser SAB sync: install coordinator/relay handler on each worker
+    (when (and sab-sync? w)
+      (install-browser-sync-handler! w))
+    w))
 
 (defn register-coordinator [config cb]
   (-register-coordinator (platform) config cb))

@@ -138,6 +138,17 @@
    :output-dir "target/live-kernel-test"
    :modules    {:sw {:entries [cljs-thread.sw]
                      :web-worker true}}}
+  ;; SAB Sync browser tests: NO Service Worker — proves SAB sync works standalone
+  ;; Code-split build, COOP/COEP headers required for SharedArrayBuffer
+  :sab-sync-browser
+  {:target     :browser
+   :output-dir "target/sab-sync-test"
+   :modules    {:shared {:entries []}
+                :screen {:init-fn    cljs-thread.sab-sync-test-browser/init!
+                         :depends-on #{:shared}}
+                :core   {:init-fn    cljs-thread.integration-core/init!
+                         :depends-on #{:shared}
+                         :web-worker true}}}
   ;; Usability tests: non-code-split browser build
   :usability-nosplit
   {:target     :browser

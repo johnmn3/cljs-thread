@@ -15,6 +15,7 @@ module.exports = defineConfig({
         "--disable-gpu",
         "--disable-dev-shm-usage",
         "--single-process",
+        "--enable-features=SharedArrayBuffer",
       ],
     },
   },
@@ -57,6 +58,11 @@ module.exports = defineConfig({
     {
       command: "node e2e/serve.js live-kernel-test",
       port: 9097,
+      reuseExistingServer: false,
+    },
+    {
+      command: "node e2e/serve.js sab-sync-test",
+      port: 9098,
       reuseExistingServer: false,
     },
   ],
