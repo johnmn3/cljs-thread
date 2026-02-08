@@ -35,4 +35,22 @@
     :core
     {:init-fn dashboard.core/init!
      :depends-on #{:shared}
+     :web-worker true}}}
+  ;; Kernel-split: separate cljs-thread runtime into its own module
+  ;; Workers load kernel.js first (small), then shared.js + core.js
+  :kernel-split
+  {:target     :browser
+   :output-dir "target/kernel-split"
+   :js-options {:resolve {"highlight.js" {:target :npm :require "highlight.js/lib/core"}
+                          "lowlight" {:target :npm :require "lowlight/lib/core"}}}
+   :modules
+   {:kernel {:entries [cljs-thread.core]}
+    :shared {:entries []
+             :depends-on #{:kernel}}
+    :screen
+    {:init-fn dashboard.screen/init!
+     :depends-on #{:shared}}
+    :core
+    {:init-fn dashboard.core/init!
+     :depends-on #{:shared}
      :web-worker true}}}}}
