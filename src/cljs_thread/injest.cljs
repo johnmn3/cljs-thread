@@ -5,7 +5,12 @@
    [cljs-thread.util :as u]
    [cljs-thread.state :as s]
    [cljs-thread.spawn :refer [spawn]]
-   [cljs-thread.in :refer [in]]))
+   [cljs-thread.in :refer [in]]
+   ;; The =>> macro expands to code that references injest.impl/xfn and
+   ;; injest.path/x>>. These runtime requires ensure those namespaces are
+   ;; loaded on all threads (including workers), not just at compile time.
+   [injest.impl]
+   [injest.path]))
 
 (defn mk-injest-ids [& [n]]
   (let [ws (-> n (or (inc (u/num-cores))) (/ 2) int)]
