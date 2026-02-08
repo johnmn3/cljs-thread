@@ -21,11 +21,11 @@
 ;; the IIFE wrapper from screen.js and making all vars globally accessible.
 ;; ---------------------------------------------------------------------------
 
-(defn square [x] (* x x))
+(defn ^:export square [x] (* x x))
 
-(defn double-it [x] (* 2 x))
+(defn ^:export double-it [x] (* 2 x))
 
-(defn add [a b] (+ a b))
+(defn ^:export add [a b] (+ a b))
 
 ;; ---------------------------------------------------------------------------
 ;; Pattern 2: Data-driven dispatch
@@ -54,7 +54,7 @@
    :inc    my-inc
    :dec    my-dec})
 
-(defn compute
+(defn ^:export compute
   "Data-driven computation: look up op by keyword, apply to val.
    The keyword and value are plain data, easily serialized."
   [op val]

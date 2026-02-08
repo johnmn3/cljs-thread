@@ -27,6 +27,22 @@
    :number? number? :string? string? :keyword? keyword?
    :int? int? :nil? nil?})
 
+;; Anchor arithmetic operators and other core fns commonly used in
+;; higher-order position (e.g. (reduce + ...), (map inc ...)).
+;; Without this, wrapping these as value-position refs causes Closure
+;; to create screen-module-local wrapper fns that aren't available on workers.
+(def ^:export core-ops
+  {:+ + :- - :* * :/ /
+   :inc inc :dec dec
+   :identity identity :str str
+   :comp comp :partial partial :juxt juxt :complement complement
+   :first first :second second :last last
+   :count count :not not
+   :max max :min min
+   :seq seq :vec vec :set set :vals vals :keys keys
+   :name name :keyword keyword :symbol symbol
+   :deref deref :pr-str pr-str})
+
 (defn ^:export compose-xf [xfs]
   (->> xfs
        (map #(if-not (coll? %)
