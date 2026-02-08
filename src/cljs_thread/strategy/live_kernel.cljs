@@ -1,0 +1,327 @@
+(ns cljs-thread.strategy.live-kernel
+  "Strategy 4: Live Kernel (hybrid of strategies 2 + 3).
+
+   Starts every worker with a minimal kernel (~20 lines JS) that boots
+   instantly, then loads the full runtime via load-scripts. Non-exported
+   functions are handled transparently via catch-and-load (IIFE unwrapping).
+
+   This strategy eliminates the need for ^:export on user functions: when
+   an eval'd function hits a ReferenceError because the referenced var is
+   IIFE-scoped in another module (e.g. screen.js), the catch-and-load
+   mechanism fetches the module source, strips the IIFE wrapper, and evals
+   the inner content in global scope so vars become globally accessible.
+
+   Two modes:
+     - Pre-built kernel: serve the static kernel.js file and pass :kernel-url
+     - Build-your-own:   omit :kernel-url and the strategy generates inline
+                          kernel code (blob URL in browser, eval string in Node)
+
+   Strategy propagation: config is stored in s/conf[:__spawn-strategy] and
+   automatically re-installed on child workers at namespace load time.
+
+   Browser: URL workers (for COOP/COEP + SW compatibility) with kernel boot
+   Node: eval workers with inline kernel + require for runtime loading"
+  (:require
+   [cljs-thread.strategy.common :as common]
+   [cljs-thread.platform :as p]
+   [cljs-thread.state :as s]
+   [cljs-thread.env :as e]
+   [cljs-thread.util :as u]))
+
+;; ---------------------------------------------------------------------------
+;; State
+;; ---------------------------------------------------------------------------
+
+(defonce ^:private runtime-scripts (atom nil))
+(defonce ^:private loadable-modules-config (atom nil))
+(defonce ^:private kernel-url-atom (atom nil))
+
+;; ---------------------------------------------------------------------------
+;; Kernel code generation
+;; ---------------------------------------------------------------------------
+
+(def browser-kernel-js
+  "Minimal browser worker kernel. Handles eval, load-scripts, and ready
+   handshake. Once the real runtime loads (via importScripts), the runtime
+   replaces self.onmessage — at which point the kernel is no longer in play."
+  "
+  // cljs-thread live kernel
+  self.onmessage = function(e) {
+    var msg = e.data;
+    if (!msg || !msg.__kernel) return;
+    var cmd = msg.cmd;
+    if (cmd === 'eval') {
+      try {
+        (0, eval)(msg.code);
+        if (msg.id) self.postMessage({__kernel_resp: true, id: msg.id, ok: true});
+      } catch(err) {
+        if (msg.id) self.postMessage({__kernel_resp: true, id: msg.id, error: err.toString()});
+      }
+    } else if (cmd === 'load-scripts') {
+      try {
+        importScripts.apply(self, msg.urls);
+        if (msg.id) self.postMessage({__kernel_resp: true, id: msg.id, ok: true});
+      } catch(err) {
+        if (msg.id) self.postMessage({__kernel_resp: true, id: msg.id, error: err.toString()});
+      }
+    } else if (cmd === 'ping') {
+      self.postMessage({__kernel_resp: true, cmd: 'pong'});
+    }
+  };
+  self.postMessage({__kernel_resp: true, cmd: 'ready'});
+  ")
+
+(def node-kernel-js
+  "Minimal Node worker kernel. Handles eval, require, and ready handshake."
+  "
+  // cljs-thread live kernel (Node)
+  var {parentPort, workerData} = require('worker_threads');
+  parentPort.on('message', function(msg) {
+    if (!msg || !msg.__kernel) return;
+    var cmd = msg.cmd;
+    if (cmd === 'eval') {
+      try {
+        (0, eval)(msg.code);
+        if (msg.id) parentPort.postMessage({__kernel_resp: true, id: msg.id, ok: true});
+      } catch(err) {
+        if (msg.id) parentPort.postMessage({__kernel_resp: true, id: msg.id, error: err.toString()});
+      }
+    } else if (cmd === 'load-scripts') {
+      try {
+        msg.urls.forEach(function(p) { require(p); });
+        if (msg.id) parentPort.postMessage({__kernel_resp: true, id: msg.id, ok: true});
+      } catch(err) {
+        if (msg.id) parentPort.postMessage({__kernel_resp: true, id: msg.id, error: err.toString()});
+      }
+    } else if (cmd === 'ping') {
+      parentPort.postMessage({__kernel_resp: true, cmd: 'pong'});
+    }
+  });
+  parentPort.postMessage({__kernel_resp: true, cmd: 'ready'});
+  ")
+
+;; ---------------------------------------------------------------------------
+;; Initialization
+;; ---------------------------------------------------------------------------
+
+(defn init!
+  "Initialize the live-kernel strategy.
+   Options:
+     :scripts          - Vector of script URLs/paths for the runtime.
+                          These are loaded via kernel's load-scripts command.
+     :loadable-modules - Vector of module URLs/paths for catch-and-load.
+                          Modules are IIFE-unwrapped and eval'd in global scope
+                          on workers, making non-exported vars accessible.
+     :kernel-url       - Optional. URL to a pre-built kernel.js file.
+                          If omitted, an inline kernel is generated.
+     :base-url         - Optional. Base URL for resolving relative script paths."
+  [{:keys [scripts loadable-modules kernel-url base-url]}]
+  (when-not (seq scripts)
+    (throw (ex-info "live-kernel: :scripts is required" {})))
+  (let [resolved (if base-url
+                   (if p/node?
+                     (common/resolve-node-paths base-url scripts)
+                     (common/resolve-script-urls base-url scripts))
+                   scripts)]
+    (reset! runtime-scripts resolved))
+  (when loadable-modules
+    (reset! loadable-modules-config loadable-modules))
+  (when kernel-url
+    (reset! kernel-url-atom kernel-url)))
+
+;; ---------------------------------------------------------------------------
+;; Internal helpers
+;; ---------------------------------------------------------------------------
+
+(defn- send-kernel-cmd!
+  "Send a kernel command to a worker. Returns a Promise that resolves
+   when the kernel acknowledges."
+  [worker cmd-map]
+  (js/Promise.
+   (fn [resolve reject]
+     (let [id (str (random-uuid))
+           cmd (assoc cmd-map :__kernel true :id id)
+           handler (fn handler [^js e]
+                     (let [d (if p/node? e (.-data e))]
+                       (when (and d (.-__kernel_resp d) (= (.-id d) id))
+                         (if p/node?
+                           (.removeListener worker "message" handler)
+                           (.removeEventListener worker "message" handler))
+                         (if (.-error d)
+                           (reject (js/Error. (.-error d)))
+                           (resolve true)))))]
+       (if p/node?
+         (do (.on worker "message" handler)
+             (.postMessage worker (clj->js cmd)))
+         (do (.addEventListener worker "message" handler)
+             (.postMessage worker (clj->js cmd))))))))
+
+(defn- wait-for-ready
+  "Wait for the kernel to send its 'ready' message. Returns a Promise."
+  [worker]
+  (js/Promise.
+   (fn [resolve _reject]
+     (let [timeout-id (atom nil)
+           handler (fn handler [^js e]
+                     (let [d (if p/node? e (.-data e))]
+                       (when (and d (.-__kernel_resp d) (= (.-cmd d) "ready"))
+                         (when @timeout-id (js/clearTimeout @timeout-id))
+                         (if p/node?
+                           (.removeListener worker "message" handler)
+                           (.removeEventListener worker "message" handler))
+                         (resolve true))))]
+       ;; Timeout after 10s
+       (reset! timeout-id
+               (js/setTimeout
+                #(do (if p/node?
+                       (.removeListener worker "message" handler)
+                       (.removeEventListener worker "message" handler))
+                     (resolve false))
+                10000))
+       (if p/node?
+         (.on worker "message" handler)
+         (.addEventListener worker "message" handler))))))
+
+(defn- boot-worker!
+  "Asynchronously boot a kernel worker by sending load-scripts command.
+   Runs in the background — worker handles cljs-thread messages once
+   the runtime finishes loading."
+  [worker]
+  (let [scripts @runtime-scripts]
+    (-> (wait-for-ready worker)
+        (.then
+         (fn [ready?]
+           (when-not ready?
+             (println "live-kernel: WARNING - kernel did not send ready signal"))
+           (when (seq scripts)
+             (send-kernel-cmd! worker {:cmd "load-scripts" :urls scripts}))))
+        (.catch (fn [e]
+                  (println "live-kernel: boot error:" (str e)))))))
+
+(defn- extract-origin
+  "Extract the origin (protocol + host + port) from a URL."
+  [url]
+  (try
+    (let [u (js/URL. url)]
+      (.-origin u))
+    (catch :default _ nil)))
+
+;; ---------------------------------------------------------------------------
+;; Worker creation
+;; ---------------------------------------------------------------------------
+
+(defn create-worker
+  "Create a worker using the live-kernel strategy.
+   Returns the Worker synchronously. The runtime is loaded asynchronously
+   in the background.
+
+   data       - cljs-thread worker data map (:id, :conf, etc.)
+   on-message - message handler function"
+  [data on-message]
+  (if p/node?
+    ;; Node: eval kernel + require for runtime loading
+    (let [wt (js* "require('worker_threads')")
+          WorkerCls (.-Worker wt)
+          w (WorkerCls. node-kernel-js
+                        #js {:eval true
+                             :workerData (clj->js data)})]
+      ;; Install coordinator/relay for sync protocol
+      (p/install-coordinator-handler! w)
+      (p/install-sync-relay! w)
+      ;; Install on-message handler
+      (.on w "message" on-message)
+      ;; Boot asynchronously
+      (boot-worker! w)
+      w)
+    ;; Browser: Use URL workers for COOP/COEP + SW compatibility.
+    ;; The kernel boots inline, then loads runtime via importScripts.
+    (let [scripts @runtime-scripts
+          kurl @kernel-url-atom]
+      (if kurl
+        ;; Pre-built kernel: load as URL worker with init data in query params
+        (let [full-url (str kurl (u/encode-qp data))
+              w (js/Worker. full-url)]
+          (set! (.-onmessage w) on-message)
+          (boot-worker! w)
+          w)
+        ;; Inline kernel: use the first runtime script as URL worker.
+        ;; This makes the worker a proper SW client and ensures COOP/COEP
+        ;; headers flow through for SAB support. The runtime URL is loaded
+        ;; directly (no kernel protocol needed in this path — the script
+        ;; IS the runtime). Same approach as blob-bootstrap and eval-kernel
+        ;; browser paths.
+        (let [script-url (first scripts)
+              full-url (str script-url (u/encode-qp data))
+              w (js/Worker. full-url)]
+          (set! (.-onmessage w) on-message)
+          w)))))
+
+;; ---------------------------------------------------------------------------
+;; Integration
+;; ---------------------------------------------------------------------------
+
+(defn- install-override!
+  "Set the create-worker-override atom."
+  []
+  (reset! p/create-worker-override
+          (fn [_url data on-message]
+            (create-worker data on-message))))
+
+(defn install!
+  "Replace the standard create-worker with live-kernel's version.
+   After calling this, all new worker spawns use the live-kernel strategy.
+
+   Also stores strategy config in s/conf[:__spawn-strategy] so child workers
+   can auto-install the strategy at namespace load time.
+
+   Options:
+     :scripts          - Vector of script URLs/paths for runtime (required)
+     :loadable-modules - Vector of module URLs/paths for catch-and-load
+     :kernel-url       - URL to pre-built kernel.js (optional)
+     :base-url         - Base URL for resolving relative paths"
+  [opts]
+  (init! opts)
+  (install-override!)
+  ;; Store strategy config in s/conf for propagation to child workers.
+  ;; Also store :loadable-modules at top level for catch-and-load in in.cljs.
+  (let [strategy-conf {:type :live-kernel
+                        :scripts @runtime-scripts}]
+    (swap! s/conf assoc :__spawn-strategy
+           (cond-> strategy-conf
+             @kernel-url-atom (assoc :kernel-url @kernel-url-atom)))
+    (when @loadable-modules-config
+      (swap! s/conf assoc :loadable-modules @loadable-modules-config))))
+
+(defn uninstall!
+  "Remove the live-kernel override, restoring default create-worker."
+  []
+  (reset! p/create-worker-override nil)
+  (reset! runtime-scripts nil)
+  (reset! loadable-modules-config nil)
+  (reset! kernel-url-atom nil)
+  (swap! s/conf dissoc :__spawn-strategy :loadable-modules))
+
+;; ---------------------------------------------------------------------------
+;; Auto-install on worker threads
+;; ---------------------------------------------------------------------------
+;; When a worker loads this namespace and s/conf has :__spawn-strategy
+;; with :type :live-kernel, automatically re-install the override so that
+;; sub-spawns (e.g. root spawning core/db/future workers) also use
+;; live-kernel. This runs at namespace load time.
+
+(defn auto-install-from-conf!
+  "Check conf for live-kernel strategy settings and re-install if found.
+   Called automatically at namespace load time on workers."
+  [conf]
+  (when-let [strategy (:__spawn-strategy conf)]
+    (when (= (:type strategy) :live-kernel)
+      (let [{:keys [scripts kernel-url]} strategy]
+        (when (seq scripts)
+          (reset! runtime-scripts scripts)
+          (when kernel-url
+            (reset! kernel-url-atom kernel-url))
+          (install-override!))))))
+
+;; Auto-install when loaded on a non-screen worker
+(when-not (e/in-screen?)
+  (auto-install-from-conf! @s/conf))

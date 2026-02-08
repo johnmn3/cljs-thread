@@ -115,6 +115,29 @@
    :output-dir "target/autoload-test"
    :modules    {:sw {:entries [cljs-thread.sw]
                      :web-worker true}}}
+  ;; Strategy 4: Live Kernel — Node.js integration test
+  :node-strategy-4
+  {:target     :node-script
+   :output-to  "target/node-integration/strategy4.js"
+   :main       cljs-thread.strategy.node-live-kernel-test/main}
+  ;; Live Kernel browser tests: code-split build with catch-and-load
+  ;; NOTE: autoload-fns is NOT in :shared — it ends up in screen.js with
+  ;; IIFE-local names. The catch-and-load mechanism handles this.
+  :live-kernel-browser
+  {:target     :browser
+   :output-dir "target/live-kernel-test"
+   :modules    {:shared {:entries []}
+                :screen {:init-fn    cljs-thread.live-kernel-test-browser/init!
+                         :depends-on #{:shared}}
+                :core   {:init-fn    cljs-thread.integration-core/init!
+                         :depends-on #{:shared}
+                         :web-worker true}}}
+  ;; Service worker for live kernel tests
+  :live-kernel-browser-sw
+  {:target     :browser
+   :output-dir "target/live-kernel-test"
+   :modules    {:sw {:entries [cljs-thread.sw]
+                     :web-worker true}}}
   ;; Usability tests: non-code-split browser build
   :usability-nosplit
   {:target     :browser

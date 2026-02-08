@@ -54,5 +54,10 @@ module.exports = defineConfig({
       port: 9096,
       reuseExistingServer: false,
     },
+    {
+      command: "node e2e/serve.js live-kernel-test",
+      port: 9097,
+      reuseExistingServer: false,
+    },
   ],
 });
