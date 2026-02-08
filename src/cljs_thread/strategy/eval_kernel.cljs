@@ -37,13 +37,17 @@
 
 (def browser-kernel-js
   "Minimal browser worker kernel. Handles eval, load-scripts, and ready handshake.
-   Once the real runtime loads (via importScripts), the runtime will replace
-   self.onmessage — at which point the kernel is no longer in play."
+   Queues non-kernel messages (e.g. port transfers) during boot and replays
+   them after importScripts loads the runtime."
   "
   // cljs-thread eval kernel
+  self.__kernel_queue = [];
   self.onmessage = function(e) {
     var msg = e.data;
-    if (!msg || !msg.__kernel) return;
+    if (!msg || !msg.__kernel) {
+      if (self.__kernel_queue) self.__kernel_queue.push(e);
+      return;
+    }
     var cmd = msg.cmd;
     if (cmd === 'eval') {
       try {
@@ -55,6 +59,16 @@
     } else if (cmd === 'load-scripts') {
       try {
         importScripts.apply(self, msg.urls);
+        var q = self.__kernel_queue;
+        self.__kernel_queue = null;
+        if (q && q.length > 0) {
+          q.forEach(function(savedE) {
+            self.dispatchEvent(new MessageEvent('message', {
+              data: savedE.data,
+              ports: savedE.ports ? Array.from(savedE.ports) : []
+            }));
+          });
+        }
         if (msg.id) self.postMessage({__kernel_resp: true, id: msg.id, ok: true});
       } catch(err) {
         if (msg.id) self.postMessage({__kernel_resp: true, id: msg.id, error: err.toString()});
@@ -67,12 +81,17 @@
   ")
 
 (def node-kernel-js
-  "Minimal Node worker kernel. Handles eval, require, and ready handshake."
+  "Minimal Node worker kernel. Handles eval, require, and ready handshake.
+   Queues non-kernel messages during boot and replays them after require."
   "
   // cljs-thread eval kernel (Node)
   var {parentPort, workerData} = require('worker_threads');
+  var __kernel_queue = [];
   parentPort.on('message', function(msg) {
-    if (!msg || !msg.__kernel) return;
+    if (!msg || !msg.__kernel) {
+      if (__kernel_queue) __kernel_queue.push(msg);
+      return;
+    }
     var cmd = msg.cmd;
     if (cmd === 'eval') {
       try {
@@ -84,6 +103,13 @@
     } else if (cmd === 'load-scripts') {
       try {
         msg.urls.forEach(function(p) { require(p); });
+        var q = __kernel_queue;
+        __kernel_queue = null;
+        if (q && q.length > 0) {
+          q.forEach(function(savedMsg) {
+            parentPort.emit('message', savedMsg);
+          });
+        }
         if (msg.id) parentPort.postMessage({__kernel_resp: true, id: msg.id, ok: true});
       } catch(err) {
         if (msg.id) parentPort.postMessage({__kernel_resp: true, id: msg.id, error: err.toString()});
@@ -234,36 +260,49 @@
       ;; Boot asynchronously
       (boot-worker! w)
       w)
-    ;; Browser: use standard URL workers with the first runtime script.
-    ;; Blob workers are NOT Service Worker clients, so their XHR calls
-    ;; to the sync protocol endpoints bypass the SW. Standard URL workers
-    ;; loaded from the same origin ARE SW clients and work correctly.
-    ;; The eval-kernel's unique value is in Node (eval workers); in browser
-    ;; we fall back to URL workers to maintain SW compatibility.
-    (let [scripts @runtime-scripts
-          script-url (first scripts)]
-      (if script-url
-        (let [full-url (str script-url (u/encode-qp data))
-              w (js/Worker. full-url)]
-          (set! (.-onmessage w) on-message)
-          w)
-        ;; Fallback: eval-only path (no scripts) — use blob kernel
-        (let [blob-url (common/make-blob-url browser-kernel-js)
-              w (js/Worker. blob-url)]
-          (set! (.-onmessage w) on-message)
-          (-> (wait-for-ready w)
-              (.then
-               (fn [_]
-                 (when (seq @code-registry)
-                   (let [entries (seq @code-registry)]
-                     (.reduce
-                      (.from js/Array (clj->js (map second entries)))
-                      (fn [p code]
-                        (.then p #(send-kernel-cmd! w {:cmd "eval" :code code})))
-                      (js/Promise.resolve true))))))
-              (.then (fn [_] (common/revoke-blob-url blob-url)))
-              (.catch (fn [e] (println "eval-kernel: boot error:" (str e)))))
-          w)))))
+    (if p/sab-sync?
+      ;; SAB sync: blob kernel workers (no SW needed for sync)
+      (let [scripts @runtime-scripts
+            init-data-js (common/embed-init-data-js data)
+            origin (when-let [s (first scripts)] (common/extract-origin s))
+            origin-line (if origin
+                          (str "globalThis.__cljs_thread_origin = "
+                               (js/JSON.stringify origin) ";\n")
+                          "")
+            full-kernel (str init-data-js origin-line
+                             common/import-scripts-resolver-js
+                             browser-kernel-js)
+            blob-url (common/make-blob-url full-kernel)
+            w (js/Worker. blob-url)]
+        (set! (.-onmessage w) on-message)
+        (boot-worker! w)
+        (js/setTimeout #(common/revoke-blob-url blob-url) 5000)
+        w)
+      ;; Legacy SW sync: URL workers (blob workers are NOT SW clients)
+      (let [scripts @runtime-scripts
+            script-url (first scripts)]
+        (if script-url
+          (let [full-url (str script-url (u/encode-qp data))
+                w (js/Worker. full-url)]
+            (set! (.-onmessage w) on-message)
+            w)
+          ;; Fallback: eval-only path (no scripts) — use blob kernel
+          (let [blob-url (common/make-blob-url browser-kernel-js)
+                w (js/Worker. blob-url)]
+            (set! (.-onmessage w) on-message)
+            (-> (wait-for-ready w)
+                (.then
+                 (fn [_]
+                   (when (seq @code-registry)
+                     (let [entries (seq @code-registry)]
+                       (.reduce
+                        (.from js/Array (clj->js (map second entries)))
+                        (fn [p code]
+                          (.then p #(send-kernel-cmd! w {:cmd "eval" :code code})))
+                        (js/Promise.resolve true))))))
+                (.then (fn [_] (common/revoke-blob-url blob-url)))
+                (.catch (fn [e] (println "eval-kernel: boot error:" (str e)))))
+            w))))))
 
 ;; ---------------------------------------------------------------------------
 ;; Integration

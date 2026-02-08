@@ -52,15 +52,6 @@
 ;; Bootstrap code generation
 ;; ---------------------------------------------------------------------------
 
-(defn- extract-origin
-  "Extract the origin (protocol + host + port) from a URL.
-   E.g. 'http://localhost:9092/shared.js' -> 'http://localhost:9092'"
-  [url]
-  (try
-    (let [u (js/URL. url)]
-      (.-origin u))
-    (catch :default _ nil)))
-
 (defn- browser-bootstrap-code
   "Generate browser bootstrap JS that:
    1. Sets __cljs_thread_init_data on globalThis
@@ -72,7 +63,7 @@
         scripts-json (js/JSON.stringify (clj->js scripts))
         spawn-scripts-line (str "globalThis.__cljs_thread_spawn_scripts = " scripts-json ";\n")
         ;; Extract origin from first script URL for XHR base
-        origin (extract-origin (first scripts))
+        origin (common/extract-origin (first scripts))
         origin-line (if origin
                       (str "globalThis.__cljs_thread_origin = " (js/JSON.stringify origin) ";\n")
                       "")
@@ -80,7 +71,8 @@
                          (map #(str "'" % "'"))
                          (clojure.string/join ", "))
         import-line (str "importScripts(" import-args ");\n")]
-    (str init-data-line spawn-scripts-line origin-line import-line)))
+    (str init-data-line spawn-scripts-line origin-line
+         common/import-scripts-resolver-js import-line)))
 
 (defn- node-bootstrap-code
   "Generate Node.js bootstrap JS that:
@@ -109,19 +101,20 @@
       ;; Node: eval worker that requires the app scripts
       (let [code (node-bootstrap-code scripts)]
         (common/create-eval-worker code data on-message))
-      ;; Browser: create standard URL workers using the first script URL.
-      ;; Workers load from e.g. http://localhost:9092/core.js?id=root&conf=...
-      ;; This makes them proper SW clients so the sync protocol (XHR
-      ;; interception) works correctly.  Blob workers are NOT SW clients,
-      ;; so we avoid blobs here.
-      ;; For single-script builds shadow-cljs inlines all dependencies
-      ;; (shared.js content) into the web-worker module, so a single
-      ;; importScripts / Worker URL is sufficient.
-      (let [script-url (first scripts)
-            full-url (str script-url (u/encode-qp data))
-            w (js/Worker. full-url)]
-        (set! (.-onmessage w) on-message)
-        w))))
+      (if p/sab-sync?
+        ;; SAB sync: use actual blob workers (no SW needed for sync)
+        (let [code (browser-bootstrap-code data scripts)
+              blob-url (common/make-blob-url code)
+              w (js/Worker. blob-url)]
+          (set! (.-onmessage w) on-message)
+          (js/setTimeout #(common/revoke-blob-url blob-url) 5000)
+          w)
+        ;; Legacy SW sync: URL workers (blob workers are NOT SW clients)
+        (let [script-url (first scripts)
+              full-url (str script-url (u/encode-qp data))
+              w (js/Worker. full-url)]
+          (set! (.-onmessage w) on-message)
+          w)))))
 
 ;; ---------------------------------------------------------------------------
 ;; Integration

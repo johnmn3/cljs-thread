@@ -86,9 +86,15 @@
               scripts-json (js/JSON.stringify (clj->js all-scripts))
               init-data-line (common/embed-init-data-js data)
               spawn-scripts-line (str "globalThis.__cljs_thread_spawn_scripts = " scripts-json ";\n")
+              origin (common/extract-origin (first all-scripts))
+              origin-line (if origin
+                            (str "globalThis.__cljs_thread_origin = "
+                                 (js/JSON.stringify origin) ";\n")
+                            "")
               imports (mapv #(str "'" % "'") all-scripts)
               import-line (str "importScripts(" (clojure.string/join ", " imports) ");\n")
-              bootstrap (str init-data-line spawn-scripts-line import-line)
+              bootstrap (str init-data-line spawn-scripts-line origin-line
+                             common/import-scripts-resolver-js import-line)
               blob-url (common/make-blob-url bootstrap)
               w (js/Worker. blob-url)]
           (set! (.-onmessage w) on-message)

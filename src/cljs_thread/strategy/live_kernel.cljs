@@ -42,13 +42,17 @@
 
 (def browser-kernel-js
   "Minimal browser worker kernel. Handles eval, load-scripts, and ready
-   handshake. Once the real runtime loads (via importScripts), the runtime
-   replaces self.onmessage — at which point the kernel is no longer in play."
+   handshake. Queues non-kernel messages (e.g. port transfers) during boot
+   and replays them after importScripts loads the runtime."
   "
   // cljs-thread live kernel
+  self.__kernel_queue = [];
   self.onmessage = function(e) {
     var msg = e.data;
-    if (!msg || !msg.__kernel) return;
+    if (!msg || !msg.__kernel) {
+      if (self.__kernel_queue) self.__kernel_queue.push(e);
+      return;
+    }
     var cmd = msg.cmd;
     if (cmd === 'eval') {
       try {
@@ -60,6 +64,16 @@
     } else if (cmd === 'load-scripts') {
       try {
         importScripts.apply(self, msg.urls);
+        var q = self.__kernel_queue;
+        self.__kernel_queue = null;
+        if (q && q.length > 0) {
+          q.forEach(function(savedE) {
+            self.dispatchEvent(new MessageEvent('message', {
+              data: savedE.data,
+              ports: savedE.ports ? Array.from(savedE.ports) : []
+            }));
+          });
+        }
         if (msg.id) self.postMessage({__kernel_resp: true, id: msg.id, ok: true});
       } catch(err) {
         if (msg.id) self.postMessage({__kernel_resp: true, id: msg.id, error: err.toString()});
@@ -72,12 +86,17 @@
   ")
 
 (def node-kernel-js
-  "Minimal Node worker kernel. Handles eval, require, and ready handshake."
+  "Minimal Node worker kernel. Handles eval, require, and ready handshake.
+   Queues non-kernel messages during boot and replays them after require."
   "
   // cljs-thread live kernel (Node)
   var {parentPort, workerData} = require('worker_threads');
+  var __kernel_queue = [];
   parentPort.on('message', function(msg) {
-    if (!msg || !msg.__kernel) return;
+    if (!msg || !msg.__kernel) {
+      if (__kernel_queue) __kernel_queue.push(msg);
+      return;
+    }
     var cmd = msg.cmd;
     if (cmd === 'eval') {
       try {
@@ -89,6 +108,13 @@
     } else if (cmd === 'load-scripts') {
       try {
         msg.urls.forEach(function(p) { require(p); });
+        var q = __kernel_queue;
+        __kernel_queue = null;
+        if (q && q.length > 0) {
+          q.forEach(function(savedMsg) {
+            parentPort.emit('message', savedMsg);
+          });
+        }
         if (msg.id) parentPort.postMessage({__kernel_resp: true, id: msg.id, ok: true});
       } catch(err) {
         if (msg.id) parentPort.postMessage({__kernel_resp: true, id: msg.id, error: err.toString()});
@@ -198,14 +224,6 @@
         (.catch (fn [e]
                   (println "live-kernel: boot error:" (str e)))))))
 
-(defn- extract-origin
-  "Extract the origin (protocol + host + port) from a URL."
-  [url]
-  (try
-    (let [u (js/URL. url)]
-      (.-origin u))
-    (catch :default _ nil)))
-
 ;; ---------------------------------------------------------------------------
 ;; Worker creation
 ;; ---------------------------------------------------------------------------
@@ -233,28 +251,40 @@
       ;; Boot asynchronously
       (boot-worker! w)
       w)
-    ;; Browser: Use URL workers for COOP/COEP + SW compatibility.
-    ;; The kernel boots inline, then loads runtime via importScripts.
-    (let [scripts @runtime-scripts
-          kurl @kernel-url-atom]
-      (if kurl
-        ;; Pre-built kernel: load as URL worker with init data in query params
-        (let [full-url (str kurl (u/encode-qp data))
-              w (js/Worker. full-url)]
-          (set! (.-onmessage w) on-message)
-          (boot-worker! w)
-          w)
-        ;; Inline kernel: use the first runtime script as URL worker.
-        ;; This makes the worker a proper SW client and ensures COOP/COEP
-        ;; headers flow through for SAB support. The runtime URL is loaded
-        ;; directly (no kernel protocol needed in this path — the script
-        ;; IS the runtime). Same approach as blob-bootstrap and eval-kernel
-        ;; browser paths.
-        (let [script-url (first scripts)
-              full-url (str script-url (u/encode-qp data))
-              w (js/Worker. full-url)]
-          (set! (.-onmessage w) on-message)
-          w)))))
+    (if p/sab-sync?
+      ;; SAB sync: blob kernel workers (no SW needed for sync)
+      (let [scripts @runtime-scripts
+            init-data-js (common/embed-init-data-js data)
+            origin (when-let [s (first scripts)] (common/extract-origin s))
+            origin-line (if origin
+                          (str "globalThis.__cljs_thread_origin = "
+                               (js/JSON.stringify origin) ";\n")
+                          "")
+            full-kernel (str init-data-js origin-line
+                             common/import-scripts-resolver-js
+                             browser-kernel-js)
+            blob-url (common/make-blob-url full-kernel)
+            w (js/Worker. blob-url)]
+        (set! (.-onmessage w) on-message)
+        (boot-worker! w)
+        (js/setTimeout #(common/revoke-blob-url blob-url) 5000)
+        w)
+      ;; Legacy SW sync: URL workers (blob workers are NOT SW clients)
+      (let [scripts @runtime-scripts
+            kurl @kernel-url-atom]
+        (if kurl
+          ;; Pre-built kernel: load as URL worker with init data in query params
+          (let [full-url (str kurl (u/encode-qp data))
+                w (js/Worker. full-url)]
+            (set! (.-onmessage w) on-message)
+            (boot-worker! w)
+            w)
+          ;; Inline kernel: use the first runtime script as URL worker
+          (let [script-url (first scripts)
+                full-url (str script-url (u/encode-qp data))
+                w (js/Worker. full-url)]
+            (set! (.-onmessage w) on-message)
+            w))))))
 
 ;; ---------------------------------------------------------------------------
 ;; Integration

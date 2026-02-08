@@ -103,6 +103,35 @@
       (catch :default _ nil))))
 
 ;; ---------------------------------------------------------------------------
+;; URL helpers
+;; ---------------------------------------------------------------------------
+
+(defn extract-origin
+  "Extract the origin (protocol + host + port) from a URL.
+   E.g. 'http://localhost:9092/shared.js' -> 'http://localhost:9092'"
+  [url]
+  (try
+    (let [u (js/URL. url)]
+      (.-origin u))
+    (catch :default _ nil)))
+
+(def import-scripts-resolver-js
+  "JS snippet that wraps self.importScripts to resolve relative URLs
+   using globalThis.__cljs_thread_origin. Blob workers have null origin,
+   so relative importScripts calls fail without this."
+  "(function(){
+  var _orig = self.importScripts;
+  self.importScripts = function(){
+    var origin = self.__cljs_thread_origin || '';
+    var args = Array.from(arguments).map(function(url){
+      if (!origin || /^(https?:|blob:)/.test(url)) return url;
+      return url.charAt(0) === '/' ? origin + url : origin + '/' + url;
+    });
+    return _orig.apply(self, args);
+  };
+})();\n")
+
+;; ---------------------------------------------------------------------------
 ;; Module URL resolution
 ;; ---------------------------------------------------------------------------
 

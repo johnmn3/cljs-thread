@@ -69,10 +69,14 @@
 (defn- resolve-url
   "Resolve a relative URL path to absolute.
    In blob workers, js/location.origin is 'null', so we use the
-   __cljs_thread_origin global set by spawn strategies."
+   __cljs_thread_origin global set by spawn strategies.
+   Already-absolute URLs (http/https/blob) are returned as-is."
   [path]
   (if (and (exists? js/globalThis.__cljs_thread_origin)
-           (some? js/globalThis.__cljs_thread_origin))
+           (some? js/globalThis.__cljs_thread_origin)
+           (not (or (.startsWith path "http://")
+                    (.startsWith path "https://")
+                    (.startsWith path "blob:"))))
     (str js/globalThis.__cljs_thread_origin path)
     path))
 
@@ -176,7 +180,7 @@
 
   IWorker
   (-create-worker [_ url data on-message]
-    (let [full-url (str url (u/encode-qp data))
+    (let [full-url (str (resolve-url url) (u/encode-qp data))
           w (js/Worker. full-url)]
       (set! (.-onmessage w) on-message)
       w))
