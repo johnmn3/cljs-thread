@@ -456,11 +456,12 @@
       (let [core-url (str js/location.origin worker-script)]
         (install-strategy! strategy-num core-url))
       (log! (str "  create-worker-override: " (pr-str (some? @p/create-worker-override))))
+      ;; No :loadable-modules needed — auto-detected from <script> tags
       (thread/init!
        {:sw-connect-string   "/sw.js"
-        :core-connect-string worker-script
-        :loadable-modules    ["screen.js"]})
-      (log! "  thread/init! called with :loadable-modules [\"screen.js\"]")
+        :core-connect-string worker-script})
+      (log! (str "  thread/init! called, auto-detected loadable-modules: "
+                 (pr-str (:loadable-modules @s/conf))))
       ;; Wait for workers
       (let [start (.getTime (js/Date.))
             check-ready

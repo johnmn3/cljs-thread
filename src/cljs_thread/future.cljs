@@ -6,7 +6,7 @@
    [cljs-thread.env :as e]
    [cljs-thread.spawn :refer [spawn]]
    [cljs-thread.on-when :refer [on-when]]
-   [cljs-thread.in :refer [in]]
+   [cljs-thread.in :as i :refer [in]]
    [cljs-thread.state :as s]
    [cljs-thread.sync :as sync]))
 
@@ -48,6 +48,18 @@
                  (spawn {:id fid :no-globals? true}
                         (s/update-conf! future-conf)))))))
 
+(defn- eval-future-fn
+  "Eval a stringified function, with catch-and-load for ReferenceError."
+  [afn]
+  (try
+    (js/eval (str "(function(){return(" afn ");})();"))
+    (catch :default e
+      (if (and (instance? js/ReferenceError e)
+               (seq (:loadable-modules @s/conf)))
+        (do (i/ensure-modules-loaded!)
+            (js/eval (str "(function(){return(" afn ");})();")))
+        (throw e)))))
+
 (defn ^:export do-future [args afn opts]
   (let [fut-id (u/gen-id)]
     (in :future [args afn fut-id]
@@ -55,7 +67,7 @@
           (let [worker (take-worker!)]
             (in worker [args afn fut-id worker]
                 (try
-                  (let [f (js/eval (str "(function(){return(" afn ");})();"))]
+                  (let [f (eval-future-fn afn)]
                     (if (seq args)
                       ((apply f args)
                        #(sync/send-response {:request-id fut-id :response %}))

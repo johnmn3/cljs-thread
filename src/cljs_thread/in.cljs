@@ -105,7 +105,7 @@
         stripped (strip-iife source)]
     (js* "(0,eval)(~{})" stripped)))
 
-(defn- ensure-modules-loaded!
+(defn ensure-modules-loaded!
   "Load all configured :loadable-modules by stripping IIFE wrappers
    and eval'ing in global scope. Only runs once per worker lifetime."
   []
@@ -201,9 +201,9 @@
 ;; ---------------------------------------------------------------------------
 ;; Eager module loading for workers
 ;;
-;; When :loadable-modules is configured, eagerly load modules at worker
-;; startup. This ensures all IIFE-scoped vars are globally accessible
-;; before any do-call or do-future execution, covering all code paths.
+;; When :loadable-modules is configured (auto-detected as just the screen
+;; module), eagerly load it at worker startup. This makes non-exported vars
+;; globally accessible before any do-call or do-future execution.
 ;; The catch-and-load in do-call serves as a safety net.
 ;; ---------------------------------------------------------------------------
 
