@@ -123,6 +123,38 @@
       (.catch #(fail! "sab:nil-result" nil (str "error: " %)))))
 
 ;; ---------------------------------------------------------------------------
+;; Tests: Performance characteristics
+;; ---------------------------------------------------------------------------
+
+(defn test-spawn-roundtrip-time []
+  (log! "\n--- Performance Characteristics ---")
+  (let [start (.now js/performance)]
+    (-> @(spawn 42)
+        (.then (fn [_]
+                 (let [elapsed (- (.now js/performance) start)]
+                   (log! (str "  spawn roundtrip: " (.toFixed elapsed 1) "ms"))
+                   (check "perf:spawn-roundtrip" true (< elapsed 5000)))))
+        (.catch #(fail! "perf:spawn-roundtrip" "< 5s" (str "error: " %))))))
+
+(defn test-in-roundtrip-time []
+  (let [start (.now js/performance)]
+    (-> @(in :core 42)
+        (.then (fn [_]
+                 (let [elapsed (- (.now js/performance) start)]
+                   (log! (str "  in :core roundtrip: " (.toFixed elapsed 1) "ms"))
+                   (check "perf:in-roundtrip" true (< elapsed 5000)))))
+        (.catch #(fail! "perf:in-roundtrip" "< 5s" (str "error: " %))))))
+
+(defn test-future-roundtrip-time []
+  (let [start (.now js/performance)]
+    (-> @(future 42)
+        (.then (fn [_]
+                 (let [elapsed (- (.now js/performance) start)]
+                   (log! (str "  future roundtrip: " (.toFixed elapsed 1) "ms"))
+                   (check "perf:future-roundtrip" true (< elapsed 5000)))))
+        (.catch #(fail! "perf:future-roundtrip" "< 5s" (str "error: " %))))))
+
+;; ---------------------------------------------------------------------------
 ;; Test runner
 ;; ---------------------------------------------------------------------------
 
@@ -146,6 +178,9 @@
         (.then test-string-result)
         (.then test-collection-result)
         (.then test-nil-result)
+        (.then test-spawn-roundtrip-time)
+        (.then test-in-roundtrip-time)
+        (.then test-future-roundtrip-time)
         ;; Done
         (.then (fn []
                  (js/clearTimeout timeout)
