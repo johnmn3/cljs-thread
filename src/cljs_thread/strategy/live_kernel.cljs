@@ -33,6 +33,7 @@
 ;; ---------------------------------------------------------------------------
 
 (defonce ^:private runtime-scripts (atom nil))
+(defonce ^:private kernel-scripts-atom (atom nil))
 (defonce ^:private loadable-modules-config (atom nil))
 (defonce ^:private kernel-url-atom (atom nil))
 
@@ -43,7 +44,12 @@
 (def browser-kernel-js
   "Minimal browser worker kernel. Handles eval, load-scripts, and ready
    handshake. Queues non-kernel messages (e.g. port transfers) during boot
-   and replays them after importScripts loads the runtime."
+   and replays them after importScripts loads the runtime.
+
+   load-scripts supports two-phase loading via optional kernelUrls field:
+     {cmd: 'load-scripts', kernelUrls: [...], urls: [...]}
+   kernelUrls are loaded first (cljs-thread runtime), then urls (app code).
+   Queue replay only happens after ALL scripts are loaded."
   "
   // cljs-thread live kernel
   self.__kernel_queue = [];
@@ -63,7 +69,12 @@
       }
     } else if (cmd === 'load-scripts') {
       try {
-        importScripts.apply(self, msg.urls);
+        if (msg.kernelUrls && msg.kernelUrls.length > 0) {
+          importScripts.apply(self, msg.kernelUrls);
+        }
+        if (msg.urls && msg.urls.length > 0) {
+          importScripts.apply(self, msg.urls);
+        }
         var q = self.__kernel_queue;
         self.__kernel_queue = null;
         if (q && q.length > 0) {
@@ -87,7 +98,12 @@
 
 (def node-kernel-js
   "Minimal Node worker kernel. Handles eval, require, and ready handshake.
-   Queues non-kernel messages during boot and replays them after require."
+   Queues non-kernel messages during boot and replays them after require.
+
+   load-scripts supports two-phase loading via optional kernelUrls field:
+     {cmd: 'load-scripts', kernelUrls: [...], urls: [...]}
+   kernelUrls are loaded first (cljs-thread runtime), then urls (app code).
+   Queue replay only happens after ALL scripts are loaded."
   "
   // cljs-thread live kernel (Node)
   var {parentPort, workerData} = require('worker_threads');
@@ -107,7 +123,12 @@
       }
     } else if (cmd === 'load-scripts') {
       try {
-        msg.urls.forEach(function(p) { require(p); });
+        if (msg.kernelUrls && msg.kernelUrls.length > 0) {
+          msg.kernelUrls.forEach(function(p) { require(p); });
+        }
+        if (msg.urls && msg.urls.length > 0) {
+          msg.urls.forEach(function(p) { require(p); });
+        }
         var q = __kernel_queue;
         __kernel_queue = null;
         if (q && q.length > 0) {
@@ -135,21 +156,30 @@
    Options:
      :scripts          - Vector of script URLs/paths for the runtime.
                           These are loaded via kernel's load-scripts command.
+     :kernel-scripts   - Optional. Vector of script URLs for the minimal
+                          cljs-thread runtime (kernel module). When provided,
+                          these are loaded FIRST, then :scripts loads after.
+                          Workers become functional for messaging after
+                          kernel-scripts load, before app code loads.
      :loadable-modules - Vector of module URLs/paths for catch-and-load.
                           Modules are IIFE-unwrapped and eval'd in global scope
                           on workers, making non-exported vars accessible.
      :kernel-url       - Optional. URL to a pre-built kernel.js file.
                           If omitted, an inline kernel is generated.
      :base-url         - Optional. Base URL for resolving relative script paths."
-  [{:keys [scripts loadable-modules kernel-url base-url]}]
-  (when-not (seq scripts)
-    (throw (ex-info "live-kernel: :scripts is required" {})))
-  (let [resolved (if base-url
-                   (if p/node?
-                     (common/resolve-node-paths base-url scripts)
-                     (common/resolve-script-urls base-url scripts))
-                   scripts)]
-    (reset! runtime-scripts resolved))
+  [{:keys [scripts kernel-scripts loadable-modules kernel-url base-url]}]
+  (when-not (or (seq scripts) (seq kernel-scripts))
+    (throw (ex-info "live-kernel: :scripts or :kernel-scripts is required" {})))
+  (let [resolve-fn (fn [paths]
+                     (if base-url
+                       (if p/node?
+                         (common/resolve-node-paths base-url paths)
+                         (common/resolve-script-urls base-url paths))
+                       paths))]
+    (when (seq scripts)
+      (reset! runtime-scripts (resolve-fn scripts)))
+    (when (seq kernel-scripts)
+      (reset! kernel-scripts-atom (resolve-fn kernel-scripts))))
   (when loadable-modules
     (reset! loadable-modules-config loadable-modules))
   (when kernel-url
@@ -211,16 +241,24 @@
 (defn- boot-worker!
   "Asynchronously boot a kernel worker by sending load-scripts command.
    Runs in the background — worker handles cljs-thread messages once
-   the runtime finishes loading."
+   the runtime finishes loading.
+
+   When kernel-scripts are configured, sends them as kernelUrls in the
+   load-scripts command. The kernel loads kernelUrls first (cljs-thread
+   runtime), then urls (app code). Queue replay happens after all load."
   [worker]
-  (let [scripts @runtime-scripts]
+  (let [kscripts @kernel-scripts-atom
+        scripts  @runtime-scripts]
     (-> (wait-for-ready worker)
         (.then
          (fn [ready?]
            (when-not ready?
              (println "live-kernel: WARNING - kernel did not send ready signal"))
-           (when (seq scripts)
-             (send-kernel-cmd! worker {:cmd "load-scripts" :urls scripts}))))
+           (when (or (seq kscripts) (seq scripts))
+             (let [cmd (cond-> {:cmd "load-scripts"}
+                         (seq kscripts) (assoc :kernelUrls kscripts)
+                         (seq scripts)  (assoc :urls scripts))]
+               (send-kernel-cmd! worker cmd)))))
         (.catch (fn [e]
                   (println "live-kernel: boot error:" (str e)))))))
 
@@ -305,7 +343,8 @@
    can auto-install the strategy at namespace load time.
 
    Options:
-     :scripts          - Vector of script URLs/paths for runtime (required)
+     :scripts          - Vector of script URLs/paths for app code
+     :kernel-scripts   - Vector of script URLs for cljs-thread runtime (loaded first)
      :loadable-modules - Vector of module URLs/paths for catch-and-load
      :kernel-url       - URL to pre-built kernel.js (optional)
      :base-url         - Base URL for resolving relative paths"
@@ -314,11 +353,11 @@
   (install-override!)
   ;; Store strategy config in s/conf for propagation to child workers.
   ;; Also store :loadable-modules at top level for catch-and-load in in.cljs.
-  (let [strategy-conf {:type :live-kernel
-                        :scripts @runtime-scripts}]
-    (swap! s/conf assoc :__spawn-strategy
-           (cond-> strategy-conf
-             @kernel-url-atom (assoc :kernel-url @kernel-url-atom)))
+  (let [strategy-conf (cond-> {:type :live-kernel}
+                        @runtime-scripts (assoc :scripts @runtime-scripts)
+                        @kernel-scripts-atom (assoc :kernel-scripts @kernel-scripts-atom)
+                        @kernel-url-atom (assoc :kernel-url @kernel-url-atom))]
+    (swap! s/conf assoc :__spawn-strategy strategy-conf)
     (when @loadable-modules-config
       (swap! s/conf assoc :loadable-modules @loadable-modules-config))))
 
@@ -327,6 +366,7 @@
   []
   (reset! p/create-worker-override nil)
   (reset! runtime-scripts nil)
+  (reset! kernel-scripts-atom nil)
   (reset! loadable-modules-config nil)
   (reset! kernel-url-atom nil)
   (swap! s/conf dissoc :__spawn-strategy :loadable-modules))
@@ -345,9 +385,12 @@
   [conf]
   (when-let [strategy (:__spawn-strategy conf)]
     (when (= (:type strategy) :live-kernel)
-      (let [{:keys [scripts kernel-url]} strategy]
-        (when (seq scripts)
-          (reset! runtime-scripts scripts)
+      (let [{:keys [scripts kernel-scripts kernel-url]} strategy]
+        (when (or (seq scripts) (seq kernel-scripts))
+          (when (seq scripts)
+            (reset! runtime-scripts scripts))
+          (when (seq kernel-scripts)
+            (reset! kernel-scripts-atom kernel-scripts))
           (when kernel-url
             (reset! kernel-url-atom kernel-url))
           (install-override!))))))

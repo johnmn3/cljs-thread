@@ -160,4 +160,18 @@
   {:target     :browser
    :output-dir "target/usability-nosplit-test"
    :modules    {:sw {:entries [cljs-thread.sw]
-                     :web-worker true}}}}}
+                     :web-worker true}}}
+  ;; Kernel-split tests: separate :kernel module for cljs-thread runtime
+  ;; Workers load kernel.js (small) first, then shared.js + core.js after.
+  ;; Tests verify two-phase boot and measure bundle size improvement.
+  :kernel-split-browser
+  {:target     :browser
+   :output-dir "target/kernel-split-test"
+   :modules    {:kernel {:entries [cljs-thread.core]}
+                :shared {:entries []
+                         :depends-on #{:kernel}}
+                :screen {:init-fn    cljs-thread.kernel-split-test-browser/init!
+                         :depends-on #{:shared}}
+                :core   {:init-fn    cljs-thread.integration-core/init!
+                         :depends-on #{:shared}
+                         :web-worker true}}}}}

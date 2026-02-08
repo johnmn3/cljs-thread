@@ -65,5 +65,10 @@ module.exports = defineConfig({
       port: 9098,
       reuseExistingServer: false,
     },
+    {
+      command: "node e2e/serve.js kernel-split-test",
+      port: 9099,
+      reuseExistingServer: false,
+    },
   ],
 });

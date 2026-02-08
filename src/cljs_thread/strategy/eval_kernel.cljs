@@ -29,6 +29,7 @@
 ;; ---------------------------------------------------------------------------
 
 (defonce ^:private runtime-scripts (atom nil))
+(defonce ^:private kernel-scripts-atom (atom nil))
 (defonce ^:private code-registry (atom {}))
 
 ;; ---------------------------------------------------------------------------
@@ -38,7 +39,11 @@
 (def browser-kernel-js
   "Minimal browser worker kernel. Handles eval, load-scripts, and ready handshake.
    Queues non-kernel messages (e.g. port transfers) during boot and replays
-   them after importScripts loads the runtime."
+   them after importScripts loads the runtime.
+
+   load-scripts supports two-phase loading via optional kernelUrls field:
+     {cmd: 'load-scripts', kernelUrls: [...], urls: [...]}
+   kernelUrls are loaded first (cljs-thread runtime), then urls (app code)."
   "
   // cljs-thread eval kernel
   self.__kernel_queue = [];
@@ -58,7 +63,12 @@
       }
     } else if (cmd === 'load-scripts') {
       try {
-        importScripts.apply(self, msg.urls);
+        if (msg.kernelUrls && msg.kernelUrls.length > 0) {
+          importScripts.apply(self, msg.kernelUrls);
+        }
+        if (msg.urls && msg.urls.length > 0) {
+          importScripts.apply(self, msg.urls);
+        }
         var q = self.__kernel_queue;
         self.__kernel_queue = null;
         if (q && q.length > 0) {
@@ -82,7 +92,11 @@
 
 (def node-kernel-js
   "Minimal Node worker kernel. Handles eval, require, and ready handshake.
-   Queues non-kernel messages during boot and replays them after require."
+   Queues non-kernel messages during boot and replays them after require.
+
+   load-scripts supports two-phase loading via optional kernelUrls field:
+     {cmd: 'load-scripts', kernelUrls: [...], urls: [...]}
+   kernelUrls are loaded first (cljs-thread runtime), then urls (app code)."
   "
   // cljs-thread eval kernel (Node)
   var {parentPort, workerData} = require('worker_threads');
@@ -102,7 +116,12 @@
       }
     } else if (cmd === 'load-scripts') {
       try {
-        msg.urls.forEach(function(p) { require(p); });
+        if (msg.kernelUrls && msg.kernelUrls.length > 0) {
+          msg.kernelUrls.forEach(function(p) { require(p); });
+        }
+        if (msg.urls && msg.urls.length > 0) {
+          msg.urls.forEach(function(p) { require(p); });
+        }
         var q = __kernel_queue;
         __kernel_queue = null;
         if (q && q.length > 0) {
@@ -128,19 +147,21 @@
 (defn init!
   "Initialize the eval-kernel strategy.
    Options:
-     :scripts - Vector of script URLs/paths that contain the cljs-thread runtime.
-                These will be loaded via load-scripts command after kernel boots.
-                If not provided, you must register code via register-code! and
-                use the eval path to stream deps.
-     :base-url - Base URL for resolving relative script paths."
-  [& [{:keys [scripts base-url]}]]
-  (when (seq scripts)
-    (let [resolved (if base-url
-                     (if p/node?
-                       (common/resolve-node-paths base-url scripts)
-                       (common/resolve-script-urls base-url scripts))
-                     scripts)]
-      (reset! runtime-scripts resolved))))
+     :scripts        - Vector of script URLs/paths for the runtime/app code.
+     :kernel-scripts - Optional. Vector of script URLs for the minimal
+                        cljs-thread runtime (kernel module). Loaded FIRST.
+     :base-url       - Base URL for resolving relative script paths."
+  [& [{:keys [scripts kernel-scripts base-url]}]]
+  (let [resolve-fn (fn [paths]
+                     (if base-url
+                       (if p/node?
+                         (common/resolve-node-paths base-url paths)
+                         (common/resolve-script-urls base-url paths))
+                       paths))]
+    (when (seq scripts)
+      (reset! runtime-scripts (resolve-fn scripts)))
+    (when (seq kernel-scripts)
+      (reset! kernel-scripts-atom (resolve-fn kernel-scripts)))))
 
 (defn register-code!
   "Register a code string under a namespace key.
@@ -204,18 +225,26 @@
 (defn- boot-worker!
   "Asynchronously boot a kernel worker by sending load-scripts/eval commands.
    This runs in the background — the worker will start handling cljs-thread
-   messages once the runtime is loaded."
+   messages once the runtime is loaded.
+
+   When kernel-scripts are configured, sends them as kernelUrls in the
+   load-scripts command. The kernel loads kernelUrls first (cljs-thread
+   runtime), then urls (app code)."
   [worker]
-  (let [scripts @runtime-scripts]
+  (let [kscripts @kernel-scripts-atom
+        scripts  @runtime-scripts]
     (-> (wait-for-ready worker)
         (.then
          (fn [ready?]
            (when-not ready?
              (println "eval-kernel: WARNING - kernel did not send ready signal"))
            (cond
-             ;; Load runtime via importScripts / require
-             (seq scripts)
-             (send-kernel-cmd! worker {:cmd "load-scripts" :urls scripts})
+             ;; Load runtime via importScripts / require (with optional kernel-scripts)
+             (or (seq kscripts) (seq scripts))
+             (let [cmd (cond-> {:cmd "load-scripts"}
+                         (seq kscripts) (assoc :kernelUrls kscripts)
+                         (seq scripts)  (assoc :urls scripts))]
+               (send-kernel-cmd! worker cmd))
 
              ;; Eval registered code
              (seq @code-registry)
@@ -314,8 +343,9 @@
    The _url argument from spawn is ignored — kernel loads scripts itself.
 
    Options:
-     :scripts  - Vector of script URLs/paths for bulk loading the runtime
-     :base-url - Base URL for resolving relative paths"
+     :scripts        - Vector of script URLs/paths for app code
+     :kernel-scripts - Vector of script URLs for cljs-thread runtime (loaded first)
+     :base-url       - Base URL for resolving relative paths"
   [& [opts]]
   (init! opts)
   (reset! p/create-worker-override
@@ -327,4 +357,5 @@
   []
   (reset! p/create-worker-override nil)
   (reset! runtime-scripts nil)
+  (reset! kernel-scripts-atom nil)
   (reset! code-registry {}))
