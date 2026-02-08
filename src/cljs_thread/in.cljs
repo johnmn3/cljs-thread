@@ -46,34 +46,21 @@
 ;; ---------------------------------------------------------------------------
 ;; On-demand module loading (catch-and-load)
 ;;
-;; Under Closure advanced compilation with code splitting, non-exported
-;; functions may be placed in modules (e.g. screen.js) with IIFE-scoped
-;; local names. When a worker eval's a stringified function referencing
-;; such names, a ReferenceError occurs. The catch-and-load mechanism:
+;; Under Closure advanced compilation with code splitting, exported
+;; functions are accessible via $APP.ns.fn names. When a worker eval's
+;; a stringified function referencing such names but the module hasn't
+;; been loaded yet, a ReferenceError occurs. The catch-and-load mechanism:
 ;; 1. Catches the ReferenceError
-;; 2. Fetches the missing module's source
-;; 3. Strips the IIFE wrapper so var declarations become global
-;; 4. Eval's the unwrapped content in global scope via indirect eval
-;; 5. Retries the original call — vars now resolve from global scope
+;; 2. Loads the missing module(s) normally (respecting IIFE boundaries)
+;; 3. Module init code runs, setting up exports on $APP
+;; 4. Retries the original call — exported names now resolve
+;;
+;; Note: functions referenced from worker-eval'd code must be ^:export
+;; or their namespace must be in :shared {:entries [...]} so Closure
+;; gives them stable $APP.ns.fn names.
 ;; ---------------------------------------------------------------------------
 
 (defonce ^:private modules-loaded? (atom false))
-
-(defn- strip-iife
-  "Strip Closure compiler IIFE wrapper from module source.
-   Transforms: (function(){'use strict'; ...}).call(this);
-   Into: pre-IIFE declarations + raw inner content."
-  [source]
-  (let [iife-start (.indexOf source "(function(){")
-        iife-end (.lastIndexOf source "}).call(this);")]
-    (if (and (>= iife-start 0) (>= iife-end 0))
-      (let [before (.substring source 0 iife-start)
-            inner (.substring source
-                              (+ iife-start (count "(function(){"))
-                              iife-end)
-            inner (.replace inner (js/RegExp. "^\\s*'use strict';\\s*") "")]
-        (str before inner))
-      source)))
 
 (defn- resolve-module-url
   "Resolve module URL for browser workers. In blob/eval workers,
@@ -89,10 +76,10 @@
           (str origin "/" url)))
       url)))
 
-(defn- load-module-unwrapped!
-  "Synchronously fetch a JS module, strip its IIFE wrapper, and eval
-   the inner content in global scope. This makes IIFE-scoped vars
-   globally accessible for subsequent eval'd function calls."
+(defn- load-module!
+  "Load a JS module by evaluating it in global scope. The module's IIFE
+   runs normally, setting up namespace exports on $APP. Only ^:export
+   functions become accessible; non-exported vars remain closure-scoped."
   [url]
   (let [source (if p/node?
                  (let [fs (js* "require('fs')")]
@@ -101,19 +88,19 @@
                        xhr (js/XMLHttpRequest.)]
                    (.open xhr "GET" resolved false)
                    (.send xhr)
-                   (.-responseText xhr)))
-        stripped (strip-iife source)]
-    (js* "(0,eval)(~{})" stripped)))
+                   (.-responseText xhr)))]
+    (js* "(0,eval)(~{})" source)))
 
 (defn ensure-modules-loaded!
-  "Load all configured :loadable-modules by stripping IIFE wrappers
-   and eval'ing in global scope. Only runs once per worker lifetime."
+  "Load all configured :loadable-modules normally (eval as-is).
+   Module init code runs, exports become available. Only runs once
+   per worker lifetime."
   []
   (when-not @modules-loaded?
     (when-let [modules (:loadable-modules @s/conf)]
       (doseq [url modules]
         (try
-          (load-module-unwrapped! url)
+          (load-module! url)
           (catch :default e
             (println :warn :failed-to-load-module url e)))))
     (reset! modules-loaded? true)))
