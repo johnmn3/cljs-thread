@@ -1,11 +1,12 @@
 (ns cljs-thread.usability-helpers
   "Shared helper functions for usability tests.
 
-   Demonstrates two key patterns for code-split builds:
+   Demonstrates two patterns for code-split builds:
 
-   1. EXPORTED FUNCTIONS — Use ^:export on any function that will be
-      referenced from spawn/in/future/pmap/=>> bodies. This ensures
-      Closure gives them stable $APP.xxx names that survive code splitting.
+   1. CATCH-AND-LOAD AUTO-RESOLUTION — Functions WITHOUT ^:export that get
+      IIFE-local names under code splitting. With :loadable-modules
+      configured, workers auto-resolve ReferenceErrors by stripping the
+      IIFE wrapper and retrying. No ^:export needed.
 
    2. DATA-DRIVEN DISPATCH — Instead of passing function references across
       workers, pass keyword descriptors and resolve to functions on the
@@ -13,17 +14,18 @@
       works without exports.")
 
 ;; ---------------------------------------------------------------------------
-;; Pattern 1: Exported utility functions
+;; Pattern 1: Functions WITHOUT ^:export
 ;;
-;; These get $APP.xxx names under advanced compilation, so they can be
-;; referenced from stringified function bodies that run on workers.
+;; These get IIFE-local names under advanced compilation with code splitting.
+;; The catch-and-load mechanism in do-call auto-resolves them by stripping
+;; the IIFE wrapper from screen.js and making all vars globally accessible.
 ;; ---------------------------------------------------------------------------
 
-(defn ^:export square [x] (* x x))
+(defn square [x] (* x x))
 
-(defn ^:export double-it [x] (* 2 x))
+(defn double-it [x] (* 2 x))
 
-(defn ^:export add [a b] (+ a b))
+(defn add [a b] (+ a b))
 
 ;; ---------------------------------------------------------------------------
 ;; Pattern 2: Data-driven dispatch
@@ -46,13 +48,13 @@
 
 (defn- my-dec [x] (dec x))
 
-(def ^:export ops
+(def ops
   {:square my-square
    :double my-double
    :inc    my-inc
    :dec    my-dec})
 
-(defn ^:export compute
+(defn compute
   "Data-driven computation: look up op by keyword, apply to val.
    The keyword and value are plain data, easily serialized."
   [op val]

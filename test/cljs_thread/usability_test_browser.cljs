@@ -458,8 +458,9 @@
       (log! (str "  create-worker-override: " (pr-str (some? @p/create-worker-override))))
       (thread/init!
        {:sw-connect-string   "/sw.js"
-        :core-connect-string worker-script})
-      (log! "  thread/init! called")
+        :core-connect-string worker-script
+        :loadable-modules    ["screen.js"]})
+      (log! "  thread/init! called with :loadable-modules [\"screen.js\"]")
       ;; Wait for workers
       (let [start (.getTime (js/Date.))
             check-ready
