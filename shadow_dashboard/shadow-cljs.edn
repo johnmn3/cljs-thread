@@ -53,4 +53,10 @@
     :core
     {:init-fn dashboard.core/init!
      :depends-on #{:shared}
-     :web-worker true}}}}}
+     :web-worker true}}}
+  ;; Standalone kernel: independent build, carries only its own cljs.core subset
+  :kernel-standalone
+  {:target     :browser
+   :output-dir "target/kernel-standalone"
+   :modules    {:kernel {:entries [cljs-thread.core]
+                         :web-worker true}}}}}

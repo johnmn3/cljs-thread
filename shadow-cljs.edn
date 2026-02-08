@@ -174,4 +174,11 @@
                          :depends-on #{:shared}}
                 :core   {:init-fn    cljs-thread.integration-core/init!
                          :depends-on #{:shared}
+                         :web-worker true}}}
+  ;; Standalone kernel: self-contained single-module build of just cljs-thread
+  ;; For measuring how small the kernel can be with independent tree-shaking
+  :kernel-standalone
+  {:target     :browser
+   :output-dir "target/kernel-standalone"
+   :modules    {:kernel {:entries [cljs-thread.core]
                          :web-worker true}}}}}
