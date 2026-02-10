@@ -13,7 +13,7 @@
                                    (cljs-thread.sync/send-response
                                     {:request-id in-id# :response (last res#)})
                                    (when (not (:deamon? cljs-thread.env/data))
-                                     (js/setTimeout #(.close js/self) 100)))]
+                                     (js/setTimeout #(cljs-thread.platform/close-self!) 100)))]
                      ~@body))))]
     (if-not (seq body)
       `(cljs-thread.spawn/do-spawn [] ~opts nil)

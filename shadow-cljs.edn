@@ -1,0 +1,184 @@
+{:deps {:aliases [:node-test]}
+ :builds
+ {:node-test
+  {:target    :node-test
+   :output-to "target/node-test/test.js"
+   :ns-regexp "\\.(util|id|macro-impl)-test$"
+   :autorun   true}
+  :browser-test
+  {:target    :browser-test
+   :test-dir  "target/browser-test"
+   :ns-regexp "-test$"}
+  ;; Service worker for integration tests (must be served from root)
+  :integration-sw
+  {:target     :browser
+   :output-dir "target/integration-test"
+   :modules    {:sw {:entries [cljs-thread.sw]
+                     :web-worker true}}}
+  ;; Integration tests: screen (main thread) + core (web worker)
+  :integration
+  {:target     :browser
+   :output-dir "target/integration-test"
+   :modules    {:shared {:entries []}
+                :screen {:init-fn    cljs-thread.integration-runner/init!
+                         :depends-on #{:shared}}
+                :core   {:init-fn    cljs-thread.integration-core/init!
+                         :depends-on #{:shared}
+                         :web-worker true}}}
+  ;; Node.js worker entry point (loaded by worker_threads)
+  :node-worker
+  {:target     :node-script
+   :output-to  "target/node-integration/worker.js"
+   :main       cljs-thread.node-worker-entry/main}
+  ;; Node.js integration test runner (main thread)
+  :node-integration
+  {:target     :node-script
+   :output-to  "target/node-integration/main.js"
+   :main       cljs-thread.node-runner/main}
+  ;; Strategy 1: Self-Spawn — Node.js integration test
+  :node-strategy-1
+  {:target     :node-script
+   :output-to  "target/node-integration/strategy1.js"
+   :main       cljs-thread.strategy.node-self-spawn-test/main}
+  ;; Strategy 2: Blob Bootstrap — Node.js integration test
+  :node-strategy-2
+  {:target     :node-script
+   :output-to  "target/node-integration/strategy2.js"
+   :main       cljs-thread.strategy.node-blob-bootstrap-test/main}
+  ;; Strategy 3: Eval Kernel — Node.js integration test
+  :node-strategy-3
+  {:target     :node-script
+   :output-to  "target/node-integration/strategy3.js"
+   :main       cljs-thread.strategy.node-eval-kernel-test/main}
+  ;; Browser strategy tests: screen module for strategy tests
+  :strategy-browser
+  {:target     :browser
+   :output-dir "target/strategy-test"
+   :modules    {:shared {:entries []}
+                :screen {:init-fn    cljs-thread.strategy-test-browser/init!
+                         :depends-on #{:shared}}
+                :core   {:init-fn    cljs-thread.integration-core/init!
+                         :depends-on #{:shared}
+                         :web-worker true}}}
+  ;; Service worker for browser strategy tests
+  :strategy-browser-sw
+  {:target     :browser
+   :output-dir "target/strategy-test"
+   :modules    {:sw {:entries [cljs-thread.sw]
+                     :web-worker true}}}
+  ;; Non-code-split browser strategy tests: single module for screen + worker
+  :strategy-nosplit
+  {:target     :browser
+   :output-dir "target/strategy-nosplit-test"
+   :modules    {:app {:init-fn    cljs-thread.strategy-test-browser/init!
+                      :web-worker true}}}
+  ;; Service worker for non-code-split strategy tests
+  :strategy-nosplit-sw
+  {:target     :browser
+   :output-dir "target/strategy-nosplit-test"
+   :modules    {:sw {:entries [cljs-thread.sw]
+                     :web-worker true}}}
+  ;; Usability tests: code-split browser build
+  ;; NOTE: usability-helpers is in :shared so that ^:export fns get $APP.xxx
+  ;; names accessible from workers. If it were only in :screen, Closure would
+  ;; use module-local aliases (e.g. cK) even for exported fns.
+  :usability-browser
+  {:target     :browser
+   :output-dir "target/usability-test"
+   :modules    {:shared {:entries [cljs-thread.usability-helpers]}
+                :screen {:init-fn    cljs-thread.usability-test-browser/init!
+                         :depends-on #{:shared}}
+                :core   {:init-fn    cljs-thread.integration-core/init!
+                         :depends-on #{:shared}
+                         :web-worker true}}}
+  ;; Service worker for usability tests
+  :usability-browser-sw
+  {:target     :browser
+   :output-dir "target/usability-test"
+   :modules    {:sw {:entries [cljs-thread.sw]
+                     :web-worker true}}}
+  ;; Autoload tests: catch-and-load proof of concept
+  ;; NOTE: autoload-fns is NOT in :shared — it will end up in screen.js
+  ;; with IIFE-local names. The catch-and-load mechanism handles this.
+  :autoload-browser
+  {:target     :browser
+   :output-dir "target/autoload-test"
+   :modules    {:shared {:entries []}
+                :screen {:init-fn    cljs-thread.autoload-test-browser/init!
+                         :depends-on #{:shared}}
+                :core   {:init-fn    cljs-thread.integration-core/init!
+                         :depends-on #{:shared}
+                         :web-worker true}}}
+  ;; Service worker for autoload tests
+  :autoload-browser-sw
+  {:target     :browser
+   :output-dir "target/autoload-test"
+   :modules    {:sw {:entries [cljs-thread.sw]
+                     :web-worker true}}}
+  ;; Strategy 4: Live Kernel — Node.js integration test
+  :node-strategy-4
+  {:target     :node-script
+   :output-to  "target/node-integration/strategy4.js"
+   :main       cljs-thread.strategy.node-live-kernel-test/main}
+  ;; Live Kernel browser tests: code-split build with catch-and-load
+  ;; NOTE: autoload-fns is NOT in :shared — it ends up in screen.js with
+  ;; IIFE-local names. The catch-and-load mechanism handles this.
+  :live-kernel-browser
+  {:target     :browser
+   :output-dir "target/live-kernel-test"
+   :modules    {:shared {:entries []}
+                :screen {:init-fn    cljs-thread.live-kernel-test-browser/init!
+                         :depends-on #{:shared}}
+                :core   {:init-fn    cljs-thread.integration-core/init!
+                         :depends-on #{:shared}
+                         :web-worker true}}}
+  ;; Service worker for live kernel tests
+  :live-kernel-browser-sw
+  {:target     :browser
+   :output-dir "target/live-kernel-test"
+   :modules    {:sw {:entries [cljs-thread.sw]
+                     :web-worker true}}}
+  ;; SAB Sync browser tests: NO Service Worker — proves SAB sync works standalone
+  ;; Code-split build, COOP/COEP headers required for SharedArrayBuffer
+  :sab-sync-browser
+  {:target     :browser
+   :output-dir "target/sab-sync-test"
+   :modules    {:shared {:entries []}
+                :screen {:init-fn    cljs-thread.sab-sync-test-browser/init!
+                         :depends-on #{:shared}}
+                :core   {:init-fn    cljs-thread.integration-core/init!
+                         :depends-on #{:shared}
+                         :web-worker true}}}
+  ;; Usability tests: non-code-split browser build
+  :usability-nosplit
+  {:target     :browser
+   :output-dir "target/usability-nosplit-test"
+   :modules    {:app {:init-fn    cljs-thread.usability-test-browser/init!
+                      :web-worker true}}}
+  ;; Service worker for usability non-code-split tests
+  :usability-nosplit-sw
+  {:target     :browser
+   :output-dir "target/usability-nosplit-test"
+   :modules    {:sw {:entries [cljs-thread.sw]
+                     :web-worker true}}}
+  ;; Kernel-split tests: separate :kernel module for cljs-thread runtime
+  ;; Workers load kernel.js (small) first, then shared.js + core.js after.
+  ;; Tests verify two-phase boot and measure bundle size improvement.
+  :kernel-split-browser
+  {:target     :browser
+   :output-dir "target/kernel-split-test"
+   :modules    {:kernel {:entries [cljs-thread.core]}
+                :shared {:entries []
+                         :depends-on #{:kernel}}
+                :screen {:init-fn    cljs-thread.kernel-split-test-browser/init!
+                         :depends-on #{:shared}}
+                :core   {:init-fn    cljs-thread.integration-core/init!
+                         :depends-on #{:shared}
+                         :web-worker true}}}
+  ;; Standalone kernel: self-contained single-module build of just cljs-thread
+  ;; For measuring how small the kernel can be with independent tree-shaking
+  :kernel-standalone
+  {:target     :browser
+   :output-dir "target/kernel-standalone"
+   :modules    {:kernel {:entries [cljs-thread.core]
+                         :web-worker true}}}}}

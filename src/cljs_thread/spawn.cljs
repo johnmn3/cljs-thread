@@ -5,28 +5,17 @@
    [cljs-thread.util :as u]
    [cljs-thread.state :as s]
    [cljs-thread.env :as e]
+   [cljs-thread.platform :as p]
    [cljs-thread.msg :as m]
    [cljs-thread.sync :as sync]))
 
-(defn after-sw-registration [p afn]
-  (-> p
-      (.then #(if (or (.-active %) (.-installing %))
-                (afn %)
-                (when (.-installing %)
-                  (.addEventListener
-                   (.-installing %) "onstatechange"
-                   (partial afn %)))))))
+;; Browser-only SW helpers — only called when not on Node
 
 (defn on-sw-registration-reload []
-  (-> (js/navigator.serviceWorker.getRegistration)
-      (.then #(when-not (.-controller js/navigator.serviceWorker)
-                (.reload js/window.location)))))
-
-(defn on-sw-registration [cb else-cb]
-  (-> (js/navigator.serviceWorker.getRegistration)
-      (.then #(if (.-controller js/navigator.serviceWorker)
-                (cb)
-                (else-cb)))))
+  (when-not p/node?
+    (-> (js/navigator.serviceWorker.getRegistration)
+        (.then #(when-not (.-controller js/navigator.serviceWorker)
+                  (.reload js/window.location))))))
 
 (defn link [id]
   (when-not (-> @s/peers (get-in [id :port]))
@@ -56,26 +45,17 @@
 (declare do-spawn)
 
 (defn spawn-sw [init-callback]
-  (let [url (str (get-connection-string {:id :sw})
-                 (u/encode-qp {:id :sw}))]
-    (on-sw-registration
-     #(init-callback)
-     #(-> (js/navigator.serviceWorker.register url)
-          (after-sw-registration
-           (fn []
-             (if (.-active %)
-               (m/add-port :sw (.-active %))
-               (do (m/add-port :sw (.-installing %))
-                   (.reload js/window.location)))
-             (init-callback)))))))
-    
+  (if p/node?
+    ;; Node: no Service Worker — coordinator is the main thread, always ready
+    (init-callback)
+    ;; Browser: register SW
+    (p/register-coordinator @s/conf init-callback)))
 
 (defn root-spawn [{:as data :keys [deamon?]}]
   (let [id (u/gen-id data)
-        url (str (get-connection-string data)
-                 (u/encode-qp (merge {:id id :conf @s/conf} data)))
-        w (js/Worker. url)]
-    (set! (.-onmessage w) m/message-handler)
+        conn-str (get-connection-string data)
+        worker-data (merge {:id id :conf @s/conf} data)
+        w (p/create-worker conn-str worker-data m/message-handler)]
     (when deamon?
       (swap! s/peers assoc id {:w w :id id})
       (when-not (= id :sw)

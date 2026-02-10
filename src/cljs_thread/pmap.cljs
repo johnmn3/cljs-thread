@@ -16,7 +16,7 @@
        (map-indexed (fn [i v]
                       (map #(% i) v)))))
 
-(defn do-pmap [conveyer afn & args]
+(defn ^:export do-pmap [conveyer afn & args]
   (let [pws (cycle (mk-injest-ids))
         zipargs (if (= 1 (count args)) 
                   (map #(do [%]) (first args))
@@ -29,11 +29,13 @@
              (map (fn [pa]
                     (->> pa
                          (mapv (fn [[p a]]
-                                 (in p (apply (apply afn conveyer) a)))))))
+                                 (in p (let [f (js/eval (str "(function(){return(" afn ");})();"))]
+                                         (apply (apply f conveyer) a))))))))
              (mapcat #(map deref %))))
       (->> pas
            (map (fn [pa]
                   (->> pa
                        (mapv (fn [[p a]]
-                               (in p (apply (apply afn conveyer) a)))))))
+                               (in p (let [f (js/eval (str "(function(){return(" afn ");})();"))]
+                                       (apply (apply f conveyer) a))))))))
            (mapcat #(map deref %))))))

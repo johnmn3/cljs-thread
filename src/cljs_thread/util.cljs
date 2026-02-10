@@ -23,12 +23,22 @@
       (str (random-uuid))))
 
 (defn num-cores []
-  (.-hardwareConcurrency js/self.navigator))
+  (cond
+    (and (exists? js/self) (exists? js/self.navigator))
+    (.-hardwareConcurrency js/self.navigator)
+
+    (and (exists? js/process) (exists? js/process.versions))
+    (let [os (js* "require('os')")]
+      (.-length (.cpus os)))
+
+    :else 4))
 
 (defn in-browser? [browser-string]
-  (-> js/navigator.userAgent
-      (.indexOf browser-string)
-      (> -1)))
+  (if (exists? js/navigator)
+    (let [ua (.-userAgent js/navigator)]
+      (when ua
+        (> (.indexOf ua browser-string) -1)))
+    false))
 
 (defn in-chrome? []
   (in-browser? "Chrome"))

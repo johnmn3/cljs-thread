@@ -6,7 +6,7 @@
 (defmacro pmap [afn & args]
   (let [[conveyer names opts body] (i/globals-locals-and-args &env afn)
         yfn `(clojure.core/fn ~names ~afn)]
-    `(cljs-thread.pmap/do-pmap ~conveyer ~yfn ~@args)))
+    `(cljs-thread.pmap/do-pmap ~conveyer (clojure.core/str ~yfn) ~@args)))
 
 (defmacro pcalls [& fns]
   (let [[conveyer names opts body] (i/globals-locals-and-args &env fns)

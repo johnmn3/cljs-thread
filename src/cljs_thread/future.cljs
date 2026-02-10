@@ -6,11 +6,11 @@
    [cljs-thread.env :as e]
    [cljs-thread.spawn :refer [spawn]]
    [cljs-thread.on-when :refer [on-when]]
-   [cljs-thread.in :refer [in]]
+   [cljs-thread.in :as i :refer [in]]
    [cljs-thread.state :as s]
    [cljs-thread.sync :as sync]))
 
-(defn take-worker! []
+(defn ^:export take-worker! []
   (when-let [p (some->> @s/future-pool :available first)]
     (swap! s/future-pool
            (fn [{:keys [available in-use]}]
@@ -18,7 +18,7 @@
               :in-use (conj in-use p)}))
     p))
 
-(defn put-back-worker! [p]
+(defn ^:export put-back-worker! [p]
   (swap! s/future-pool
          (fn [{:keys [available in-use]}]
            {:available (conj available p)
@@ -29,12 +29,14 @@
   (let [ws (-> n (or (inc (u/num-cores))) (/ 2) int)]
     (->> ws range (map #(keyword (str "fp-" %))))))
 
-(defn init-future! [& [{:as config-map :keys [future-ids]}]]
+(defn ^:export init-future! [& [{:as config-map :keys [future-ids]}]]
   (assert (e/in-future?))
   (when config-map
     (s/update-conf! config-map)
     (when future-ids
-      (swap! s/future-pool update :available into future-ids))))
+      ;; Ensure future-ids are keywords — in Node.js, workerData round-trips
+      ;; through clj->js/js->clj which converts keyword values to strings.
+      (swap! s/future-pool update :available into (map keyword future-ids)))))
 
 (defn start-futures [configs]
   (let [future-ids (mk-worker-ids (:future-count configs))
@@ -46,18 +48,31 @@
                  (spawn {:id fid :no-globals? true}
                         (s/update-conf! future-conf)))))))
 
-(defn do-future [args afn opts]
+(defn- eval-future-fn
+  "Eval a stringified function, with catch-and-load for ReferenceError."
+  [afn]
+  (try
+    (js/eval (str "(function(){return(" afn ");})();"))
+    (catch :default e
+      (if (and (instance? js/ReferenceError e)
+               (seq (:loadable-modules @s/conf)))
+        (do (i/ensure-modules-loaded!)
+            (js/eval (str "(function(){return(" afn ");})();")))
+        (throw e)))))
+
+(defn ^:export do-future [args afn opts]
   (let [fut-id (u/gen-id)]
-    (in :future [args afn fut-id] ;; <- TODO: prevent implicit conveyer param duplication (dissallowed for arraybuffer transfers)
+    (in :future [args afn fut-id]
         (on-when (-> @s/future-pool :available seq) {:duration 5}
           (let [worker (take-worker!)]
             (in worker [args afn fut-id worker]
                 (try
-                  (if (seq args)
-                    ((apply afn args)
-                     #(sync/send-response {:request-id fut-id :response %}))
-                    ((afn)
-                     #(sync/send-response {:request-id fut-id :response %})))
+                  (let [f (eval-future-fn afn)]
+                    (if (seq args)
+                      ((apply f args)
+                       #(sync/send-response {:request-id fut-id :response %}))
+                      ((f)
+                       #(sync/send-response {:request-id fut-id :response %}))))
                   (catch :default e
                     (sync/send-response {:request-id fut-id :response {:error (pr-str e)}})))
                 (in :future

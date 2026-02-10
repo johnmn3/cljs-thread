@@ -35,7 +35,7 @@
                       #_#_:else (println :RUNNING_INTERVAL :SECONDS_PASSED (/ time-passed 1000)))))]
            (reset! timer-id (js/setInterval interval-fn duration))))))))
 
-(defn do-on-when [pred opts afn]
+(defn ^:export do-on-when [pred opts afn]
   (-> (wait-until pred opts)
       (.then afn)))
 
@@ -64,6 +64,6 @@
                    (resolve* (resolve true))
                    (resolve* true)))))))))))
 
-(defn do-on-watch [atm pred opts afn]
+(defn ^:export do-on-watch [atm pred opts afn]
   (-> (watch-until atm pred opts)
       (.then afn)))
