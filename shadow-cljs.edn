@@ -181,4 +181,32 @@
   {:target     :browser
    :output-dir "target/kernel-standalone"
    :modules    {:kernel {:entries [cljs-thread.core]
+                         :web-worker true}}}
+  ;; Strategy 5: Fat Kernel — Node.js integration test
+  :node-strategy-5
+  {:target     :node-script
+   :output-to  "target/node-integration/strategy5.js"
+   :main       cljs-thread.strategy.node-fat-kernel-test/main}
+  ;; Fat Kernel browser tests: code-split build, NO Service Worker
+  ;; Workers boot from blob with full runtime — no importScripts needed
+  :fat-kernel-browser
+  {:target     :browser
+   :output-dir "target/fat-kernel-test"
+   :modules    {:shared {:entries []}
+                :screen {:init-fn    cljs-thread.fat-kernel-test-browser/init!
+                         :depends-on #{:shared}}
+                :core   {:init-fn    cljs-thread.integration-core/init!
+                         :depends-on #{:shared}
+                         :web-worker true}}}
+  ;; Fat Kernel browser tests with kernel-split: dedicated kernel module
+  :fat-kernel-split-browser
+  {:target     :browser
+   :output-dir "target/fat-kernel-split-test"
+   :modules    {:kernel {:entries [cljs-thread.core]}
+                :shared {:entries []
+                         :depends-on #{:kernel}}
+                :screen {:init-fn    cljs-thread.fat-kernel-test-browser/init!
+                         :depends-on #{:shared}}
+                :core   {:init-fn    cljs-thread.integration-core/init!
+                         :depends-on #{:shared :kernel}
                          :web-worker true}}}}}

@@ -70,5 +70,10 @@ module.exports = defineConfig({
       port: 9099,
       reuseExistingServer: false,
     },
+    {
+      command: "node e2e/serve.js fat-kernel-test",
+      port: 9100,
+      reuseExistingServer: false,
+    },
   ],
 });
