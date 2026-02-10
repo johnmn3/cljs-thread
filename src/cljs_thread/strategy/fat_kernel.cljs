@@ -404,6 +404,33 @@
   (swap! s/conf dissoc :__spawn-strategy :loadable-modules))
 
 ;; ---------------------------------------------------------------------------
+;; Auto-detection for zero-config init!
+;; ---------------------------------------------------------------------------
+
+(defn detect-core-connect-string
+  "Auto-detect the core-connect-string by examining the build manifest
+   or <script> tags. Returns a URL string like '/core.js' or '/app.js',
+   or nil if detection fails.
+
+   Browser: checks manifest.edn for :core/:kernel/:app module, falls
+   back to single-script detection.
+   Node: returns __filename."
+  []
+  (if p/node?
+    (try (js* "__filename") (catch :default _ nil))
+    (let [base-url (detect-base-url-from-scripts)
+          detected (or (when base-url (detect-kernel-from-manifest base-url))
+                       (detect-kernel-from-script-tags))]
+      (when detected
+        ;; Return the path portion of the first kernel URL
+        (let [url (first (:kernel-urls detected))]
+          (when url
+            (try
+              ;; Extract pathname from full URL
+              (.-pathname (js/URL. url))
+              (catch :default _ url))))))))
+
+;; ---------------------------------------------------------------------------
 ;; Auto-install on worker threads
 ;; ---------------------------------------------------------------------------
 

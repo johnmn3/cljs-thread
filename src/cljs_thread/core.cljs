@@ -15,7 +15,8 @@
    [cljs-thread.repl]
    [cljs-thread.future]
    [cljs-thread.injest]
-   [cljs-thread.pmap]))
+   [cljs-thread.pmap]
+   [cljs-thread.strategy.fat-kernel :as fat-kernel]))
 
 (enable-console-print!)
 
@@ -48,11 +49,36 @@
       (when screen-module
         [screen-module]))))
 
-(defn init! [& [config-map]]
+(defn init!
+  "Initialize cljs-thread. Supports zero-config usage:
+
+   (init!)                                    ;; Auto-detect everything
+   (init! {:core-connect-string \"/core.js\"}) ;; Explicit worker script
+   (init! {:sw-connect-string \"/sw.js\" ...}) ;; SW mode (legacy)
+
+   Zero-config auto-detection:
+   1. If :core-connect-string is not provided, detect from manifest.edn
+      or <script> tags (browser) or __filename (Node).
+   2. If SharedArrayBuffer is available and no :sw-connect-string given,
+      auto-install the fat-kernel strategy (blob workers, no SW needed).
+   3. If an explicit strategy is already installed (create-worker-override),
+      use that instead of auto-installing."
+  [& [config-map]]
   (assert (e/in-screen?))
   (when config-map
     (swap! s/conf merge config-map))
+  ;; Auto-detect core-connect-string if not provided
+  (when-not (:core-connect-string @s/conf)
+    (when-let [detected (fat-kernel/detect-core-connect-string)]
+      (swap! s/conf assoc :core-connect-string detected)))
+  ;; Auto-install fat-kernel when SAB is available, no SW configured,
+  ;; and no strategy has been manually installed.
+  (when (and p/sab-sync?
+             (not (:sw-connect-string @s/conf))
+             (not @p/create-worker-override))
+    (fat-kernel/install!))
   ;; Auto-detect loadable modules if not explicitly configured
+  ;; (fat-kernel/install! may have already set these with absolute URLs)
   (when-not (:loadable-modules @s/conf)
     (when-let [modules (auto-detect-loadable-modules @s/conf)]
       (swap! s/conf assoc :loadable-modules modules)))

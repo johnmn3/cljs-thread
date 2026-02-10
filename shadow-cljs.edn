@@ -215,4 +215,14 @@
   {:target     :browser
    :output-dir "target/fat-kernel-nosplit-test"
    :modules    {:app {:init-fn    cljs-thread.fat-kernel-nosplit-test-browser/init!
-                      :web-worker true}}}}}}
+                      :web-worker true}}}
+  ;; Zero-config tests: init! with NO arguments (code-split)
+  :zero-config-browser
+  {:target     :browser
+   :output-dir "target/zero-config-test"
+   :modules    {:shared {:entries []}
+                :screen {:init-fn    cljs-thread.zero-config-test-browser/init!
+                         :depends-on #{:shared}}
+                :core   {:init-fn    cljs-thread.integration-core/init!
+                         :depends-on #{:shared}
+                         :web-worker true}}}}}}
