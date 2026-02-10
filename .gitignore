@@ -17,3 +17,4 @@ test-results
 .lsp/
 .portal
 .vscode
+.proxy-shim.pid
