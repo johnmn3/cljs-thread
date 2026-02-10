@@ -2,11 +2,19 @@
 
 ## _"One step closer to threads on the web"_
 
-`cljs-thread` makes using webworkers take less... work. Eventually, I'd like it to be able to minimize the amount of build tool configuration it takes to spawn workers in Clojurescript too, but that's a longer term goal.
+`cljs-thread` brings familiar threading primitives to ClojureScript — both in the browser (Web Workers) and on Node.js (worker_threads). Zero configuration required.
 
-When you `spawn` a node, it automatically creates connections to all the other nodes, creating a fully connected mesh.
+```clojure
+(ns my-app.screen
+  (:require [cljs-thread.core :as thread :refer [spawn in future pmap =>>]]))
 
-The `in` macro then abstracts over the message passing infrastructure, with implicit binding conveyance and blocking semantics, allowing you to do work on threads in a manner similar to what you would experience with threads in Clojure and other languages. `cljs-thread` provides familiar constructs like `future`, `pmap`, `pcalls` and `pvalues`. For transducing over large sequences in parallel, the `=>>` thread-last macro is provided.
+(thread/init!)  ;; auto-detects everything
+
+@(future (+ 1 2 3))
+;=> 6
+```
+
+When you `spawn` a node, it automatically creates connections to all the other nodes, forming a fully connected mesh. The `in` macro abstracts over message passing with implicit binding conveyance and blocking semantics, allowing you to work with threads in a manner similar to Clojure on the JVM. `cljs-thread` provides `future`, `pmap`, `pcalls`, `pvalues`, and the parallel transducer macro `=>>`.
 
 ## Getting Started
 
@@ -17,59 +25,132 @@ Place the following in the `:deps` map of your `deps.edn` file:
 net.clojars.john/cljs-thread {:mvn/version "0.1.0-alpha.4"}
 ...
 ```
+
 ### Build Tools
+
 #### Shadow-cljs
-You'll want to put something like this in the build section of your `shadow-cljs.edn` file:
-```
- :builds
- {:repl ; <- just for getting a stable connection for repling, optional
-  {:target :browser
-   :output-dir "resources/public"
-   :modules {:repl {:entries [dashboard.core]
-                    :web-worker true}}}
-  :sw
-  {:target :browser
-   :output-dir "resources/public"
-   :modules {:sw {:entries [dashboard.core]
-                  :web-worker true}}}
-  :core
+
+The simplest setup is a single-module build:
+```clojure
+{:builds
+ {:app
   {:target     :browser
-   :output-dir "resources/public"
+   :output-dir "resources/public/js"
+   :modules    {:app {:init-fn my-app.screen/init!}}}}}
+```
+
+For larger applications, a code-split build separates the screen (main thread) from worker code:
+```clojure
+{:builds
+ {:app
+  {:target     :browser
+   :output-dir "resources/public/js"
    :modules
    {:shared {:entries []}
-    :screen
-    {:init-fn dashboard.screen/init!
-     :depends-on #{:shared}}
-    :core
-    {:init-fn dashboard.core/init!
-     :depends-on #{:shared}
-     :web-worker true}}}}}
+    :screen {:init-fn    my-app.screen/init!
+             :depends-on #{:shared}}
+    :core   {:init-fn    my-app.core/init!
+             :depends-on #{:shared}
+             :web-worker true}}}}}
 ```
-You can get by with less, but if you want a comfortable repling experience then you want your build file to look something similar to the above. Technically, you can get get by with just a single build artifact if you're careful enough in your worker code to never access `js/window`, `js/document`, etc. But, by having a `screen.js` artifact, you can more easily separate your "main thread" code from your web worker code. Having a separate service worker artifact (`:sw`) is fine because it doesn't need your deps - we only use it for getting blocking semantics in web workers. Having a separate `:repl` artifact is helpful for when you're using an IDE that only allows you to select repl connections on a per-build-id basis (such as VsCode Calva, which I use).
 
-The sub-project in this repo - `shadow_dashboard` - has an example project with a working build config (similar to the above) that you can use as an example to get started.
+For the best separation, you can provide a dedicated `:cljs-thread` kernel module. This bundles the cljs-thread runtime into a standalone artifact that the library auto-detects:
+```clojure
+{:builds
+ {:app
+  {:target     :browser
+   :output-dir "resources/public/js"
+   :modules
+   {:cljs-thread {:entries [cljs-thread.core]}
+    :shared      {:entries []
+                  :depends-on #{:cljs-thread}}
+    :screen      {:init-fn    my-app.screen/init!
+                  :depends-on #{:shared}}
+    :core        {:init-fn    my-app.core/init!
+                  :depends-on #{:shared :cljs-thread}
+                  :web-worker true}}}}}
+```
 
-To launch the project in Calva, type `shift-cmd-p` and choose _"Start a Project REPL and Connect"_ and then enable the three build options that come up. When it asks which build you want to connect to, select `:repl`. You can also connect to `:screen` and that will be a stable connection as well. For `:core`, however, in the above configuration, there will be lots of web worker connections pointed to it and you can't control which one will have ended up as the current connection.
+By having a `:screen` module, you can more easily separate your "main thread" code from your web worker code. Having a separate service worker artifact (`:sw`) is optional — it's only needed if you can't use COOP/COEP headers (see [Deployment](#deployment)).
 
-You can choose in Calva which build your are currently connected to by typing `shift-cmd-p` and choosing _"Select CLJS Build Connection"_.
+The sub-project in this repo — `shadow_dashboard` — has an example project with a working build config that you can use as a reference.
 
-There are lots of possibilities with build configurations around web workers and eventually there will be an entire wiki article here on just that topic. Please file an issue if you find improved workflows or have questions about how to get things working.
+To launch the project in Calva, type `shift-cmd-p` and choose _"Start a Project REPL and Connect"_ and then enable the build options that come up. You can choose which build your are connected to by typing `shift-cmd-p` and choosing _"Select CLJS Build Connection"_.
 
 #### Figwheel
-There currently isn't a figwheel build configuration example provided in this repo, but I've had prior versions of this library working on figwheel and I'm hoping to have examples here soon - I just haven't had time. Please submit a PR if you get a great build configuration similar to the one above for shadow.
+There currently isn't a figwheel build configuration example provided in this repo, but I've had prior versions of this library working on figwheel and I'm hoping to have examples here soon. Please submit a PR if you get a great build configuration similar to the one above for shadow.
 
 #### cljs.main
-As with figwheel, a solid set of directions for getting this working with the default `cljs.main` build tools is forthcoming - PRs welcome!
+A solid set of directions for getting this working with the default `cljs.main` build tools is forthcoming — PRs welcome!
 
-### cljs-thread.core/init!
-Eventually, once all the different build tools have robust configurations, I would like to iron out a set of default configurations within `cljs-thread` such that things Just Work - just like spawning threads on the JVM. For now, you have to provide `cljs-thread` details on what your build configuration is _in code_ with `cljs-thread.core/init!` like so:
+### `cljs-thread.core/init!`
+
+`init!` supports zero-config usage — it auto-detects your build output and configures everything:
+
+```clojure
+(thread/init!)  ;; zero-config: auto-detect everything
 ```
+
+Under the hood, `init!` will:
+1. Detect your worker script from `manifest.edn` (shadow-cljs writes this to your `:output-dir`)
+2. Auto-install the fat kernel strategy when `SharedArrayBuffer` is available — workers boot instantly from blob URLs with the full runtime inlined, no Service Worker needed
+3. Auto-detect loadable modules for on-demand code loading
+
+You can also provide explicit configuration if needed:
+```clojure
+(thread/init!
+ {:core-connect-string "/core.js"})  ;; explicit worker script path
+```
+
+Or use the legacy Service Worker mode for environments without COOP/COEP headers:
+```clojure
 (thread/init!
  {:sw-connect-string "/sw.js"
-  :repl-connect-string "/repl.js"
   :core-connect-string "/core.js"})
 ```
-`:sw-connect-string` defines where your service worker artifact is found, relative to the base directory of your server. Same goes for `:repl-connect-string` and `:core-connect-string`. You can also provide a `:root-connect-string`, `:future-connect-string` and `:injest-connect-string` - if you don't, they will default to your `:core-connect-string`.
+
+Configuration options:
+| Key | Description |
+|-----|-------------|
+| `:core-connect-string` | Path to worker script (auto-detected from manifest.edn) |
+| `:sw-connect-string` | Path to Service Worker script (enables SW sync mode) |
+| `:repl-connect-string` | Path to REPL worker script |
+| `:loadable-modules` | Vector of module URLs for catch-and-load |
+
+### Node.js
+
+`cljs-thread` works on Node.js using `worker_threads` with eval workers. Setup is the same:
+
+```clojure
+;; shadow-cljs.edn
+{:builds
+ {:app
+  {:target    :node-script
+   :output-to "target/app.js"
+   :main      my-app.core/main}}}
+```
+
+```clojure
+(ns my-app.core
+  (:require [cljs-thread.core :as thread :refer [spawn in future pmap]]))
+
+(defn main []
+  (thread/init!)
+  @(future (+ 1 2 3))  ;=> 6
+  (println "done"))
+```
+
+The same `spawn`, `in`, `future`, `pmap`, and `=>>` primitives work identically.
+
+## How It Works
+
+`cljs-thread` uses a **fat kernel** architecture: when `init!` is called, it detects the compiled build output and caches the source. Every worker is created from this cached source — a blob URL (browser) or eval string (Node) — with the full cljs-thread runtime inlined. Workers wake up immediately functional, able to process `in`, `future`, `pmap`, sync, and mesh messaging without any additional loading.
+
+**Blocking semantics** are provided by `SharedArrayBuffer` + `Atomics.wait` (preferred) or a Service Worker fallback. SAB sync requires cross-origin isolation headers (see [Deployment](#deployment)).
+
+**Catch-and-load**: when a worker evaluates code that references app-specific vars not in the kernel, it catches the `ReferenceError` and transparently loads the required module on demand.
+
+**Worker mesh**: `spawn` creates workers that automatically connect to all other active workers, forming a fully connected mesh. The `in` macro routes execution to any worker by reference or `:id`.
 
 ## Demo
 https://johnmn3.github.io/cljs-thread/
@@ -85,21 +166,21 @@ _No args_:
 ```clojure
 (def s1 (spawn))
 ```
-This will create a webworker and you'll be able to do something with it afterwards.
+This will create a worker and you'll be able to do something with it afterwards.
 
 _Only a body_:
 ```clojure
 (spawn (println :addition (+ 1 2 3)))
 ;:addition 6
 ```
-This will create a webworker, run the code in it (presumably for side effects) and then terminate the worker. This is considered an _ephemeral worker_.
+This will create a worker, run the code in it (presumably for side effects) and then terminate the worker. This is considered an _ephemeral worker_.
 
 _Named worker_:
 ```clojure
 (def s2 (spawn {:id :s2} (println :hi :from thread/id)))
 ;:hi :from :s2
 ```
-This creates a webworker named `:s2` and you'll be able to do something with `s2` afterwards.
+This creates a worker named `:s2` and you'll be able to do something with `s2` afterwards.
 
 _Ephemeral deref_:
 ```clojure
@@ -144,7 +225,7 @@ You can also deref the return value of `in`:
 ### Binding conveyance
 For most functions, `cljs-thread` will try to automatically convey local bindings, as well as vars local to the invoking namespace, across workers:
 ```clojure
-(let [x 3] 
+(let [x 3]
     @(in s1 (+ 1 @(in s2 (+ 2 x)))))
 ;=> 6
 ```
@@ -211,7 +292,7 @@ When you want to convert an async javascript function into a synchronous one, `y
 > @(spawn (+ 1 @(spawn (+ 2 3))))
 > ;=> 6
 >```
-> But that will take 10 to 100 times longer, due to worker startup delay, so make sure that your work is truly heavy and ephemeral. With re-frame, react and a few other megabytes of dev-time dependencies loaded in `/core.js`, that call took me about 1 second to complete - not very fast.
+> But that will take longer due to worker startup delay, so make sure that your work is truly heavy and ephemeral.
 
 > Also note: You can use `yield` to temporarily prevent the closing of an ephemeral `spawn` as well:
 >```clojure
@@ -229,9 +310,6 @@ You don't have to create new workers though. `cljs-thread` comes with a thread p
   @(future (+ 1 @(future (+ x 3)))))
 ;=> 6
 ```
-That took about 20 milliseconds.
-
-> Note: A single synchronous `future` call will cost you around 8 to 10 milliseconds. A single synchronous `in` call will cost you around 4 to 5 milliseconds, depending on if it needs to be proxied.
 
 Again, all of these constructs return promises on the main/screen thread:
 ```clojure
@@ -243,7 +321,7 @@ Again, all of these constructs return promises on the main/screen thread:
 ```
 You wouldn't want to do this for such a lite-weight api call, but if you have some large payloads that you need fetched and normalized, it can be convenient to run them in futures for handling off the main thread.
 
-`cljs-thread`'s blocking semantics are great for achieving synchronous control flow when you need it, but as shown above, it has a performance cost of having to wait on the service worker to proxy results. Therefore, you wouldn't want to use them in very hot loops or for implementing tight algorithms. We can beat single threaded performance though if we're smart about chunking work up into large pieces and fanning it across a pool of workers. You can design your own system for doing that, but `cljs-thread` comes with a solution for pure functions: `=>>`. It also comes with a version of `pmap`. (see the official [`clojure.core/pmap`](https://clojuredocs.org/clojure.core/pmap) for more info)
+`cljs-thread`'s blocking semantics are great for achieving synchronous control flow when you need it. You wouldn't want to use them in very hot loops or for implementing tight algorithms. We can beat single threaded performance though if we're smart about chunking work up into large pieces and fanning it across a pool of workers. You can design your own system for doing that, but `cljs-thread` comes with a solution for pure functions: `=>>`. It also comes with a version of `pmap`. (see the official [`clojure.core/pmap`](https://clojuredocs.org/clojure.core/pmap) for more info)
 
 ## `pmap`
 `pmap` lazily consumes one or more collections and maps a function across them in parallel.
@@ -371,6 +449,62 @@ It would be nice to implement a sub-repl that wrapped repl evaluations in the `i
 
 > Note: There are a host of other use cases that weren't previously possible that become possible with blocking semantics. Another example might be porting Datascript to IndexedDB using a synchronous set/get interface. If there are any other possibilities that come to mind - things you've always wanted to be able to do but weren't able to due to the lack of blocking semantics in the browser - feel free to drop a request in the issues and we can explore it.
 
+## Deployment
+
+### Cross-Origin Isolation Headers
+
+For the best experience, serve your application with cross-origin isolation headers. These enable `SharedArrayBuffer`, which `cljs-thread` uses for fast blocking semantics without a Service Worker:
+
+```
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+**Express:**
+```javascript
+app.use((req, res, next) => {
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+  next();
+});
+```
+
+**Nginx:**
+```nginx
+add_header Cross-Origin-Opener-Policy "same-origin" always;
+add_header Cross-Origin-Embedder-Policy "require-corp" always;
+```
+
+### Service Worker Fallback
+
+If you can't set COOP/COEP headers (e.g., embedding in third-party pages), `cljs-thread` falls back to using a Service Worker for blocking semantics. Add a `:sw` build target and pass `:sw-connect-string` to `init!`:
+
+```clojure
+;; shadow-cljs.edn — add SW build
+{:builds
+ {:sw {:target     :browser
+       :output-dir "resources/public/js"
+       :modules    {:sw {:entries [cljs-thread.sw]
+                         :web-worker true}}}
+  ;; ... your app build ...
+  }}
+```
+
+```clojure
+(thread/init!
+ {:sw-connect-string "/js/sw.js"
+  :core-connect-string "/js/core.js"})
+```
+
+## Platform Support
+
+| Platform | Sync Mechanism | Notes |
+|----------|---------------|-------|
+| Chrome/Edge | SharedArrayBuffer + Atomics | Full support with COOP/COEP headers |
+| Firefox | SharedArrayBuffer + Atomics | Full support with COOP/COEP headers |
+| Safari | Service Worker fallback | SAB restricted in workers |
+| Node.js | SharedArrayBuffer + Atomics | Full support, no headers needed |
+
 ## Some history
 
 `cljs-thread` is derived from [`tau.alpha`](https://github.com/johnmn3/tau.alpha) which I released about four years ago. That project evolved towards working with SharedArrayBuffers (SABs). A slightly update version of `tau.alpha` is available here: https://gitlab.com/johnmn3/tau and you can see a demo of the benefits of SABs here: https://simultaneous.netlify.app/
@@ -378,3 +512,5 @@ It would be nice to implement a sub-repl that wrapped repl evaluations in the `i
 At an early point during the development of `tau.alpha` about four years ago, I got blocking semantics to work with these synchronous XHRs and hacking the response from a sharedworker. I eventually abandoned this strategy when I discovered you could get blocking semantics and better performance out of SABs and `js/Atomics`.
 
 Unfortunately there was lot's of drama around the security of SABs and, years later, they require very constraining security settings, making their usage impractical for some deployment situations. Compared to using typed arrays in `tau.alpha`, you'll never get that same performance in `cljs-thread`, in terms of worker-to-worker communication - in `tau.alpha` you're literally using shared memory - but there's no reason these other features shouldn't be available in non-SAB scenarios, so I figured it would make sense to extract these other bits out into `cljs-thread` and build V2 of `tau.alpha` on top of it. With `tau.beta`, built on `cljs-thread`, I'll be implementing SAB-less variants of `atom`s and `agent`s, with similar semantics to that of Clojure's. Then I'll be implementing SAB-based versions that folks can opt in to if desired.
+
+The fat kernel architecture represents the culmination of this work — workers now boot with the full runtime inlined, eliminating the two-phase boot, Service Worker dependency, and manual configuration that characterized earlier versions. `(thread/init!)` with zero arguments is all you need.

@@ -6,14 +6,6 @@ const path = require("path");
 const mode = process.argv[2] || "browser-test";
 const DIR = path.join(__dirname, "..", "target", mode);
 const PORT = mode === "integration-test" ? 9091
-  : mode === "strategy-test" ? 9092
-  : mode === "strategy-nosplit-test" ? 9093
-  : mode === "usability-test" ? 9094
-  : mode === "usability-nosplit-test" ? 9095
-  : mode === "autoload-test" ? 9096
-  : mode === "live-kernel-test" ? 9097
-  : mode === "sab-sync-test" ? 9098
-  : mode === "kernel-split-test" ? 9099
   : mode === "fat-kernel-test" ? 9100
   : mode === "fat-kernel-split-test" ? 9101
   : mode === "fat-kernel-nosplit-test" ? 9102
@@ -42,9 +34,8 @@ const server = http.createServer((req, res) => {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
     };
-    // Cross-origin isolation headers required for SharedArrayBuffer and
-    // Service Worker scope in cljs-thread integration tests.
-    if (mode === "integration-test" || mode === "strategy-test" || mode === "strategy-nosplit-test" || mode === "usability-test" || mode === "usability-nosplit-test" || mode === "autoload-test" || mode === "live-kernel-test" || mode === "sab-sync-test" || mode === "kernel-split-test" || mode === "fat-kernel-test" || mode === "fat-kernel-split-test" || mode === "fat-kernel-nosplit-test" || mode === "zero-config-test") {
+    // Cross-origin isolation headers required for SharedArrayBuffer
+    if (mode === "integration-test" || mode === "fat-kernel-test" || mode === "fat-kernel-split-test" || mode === "fat-kernel-nosplit-test" || mode === "zero-config-test") {
       headers["Cross-Origin-Opener-Policy"] = "same-origin";
       headers["Cross-Origin-Embedder-Policy"] = "credentialless";
     }

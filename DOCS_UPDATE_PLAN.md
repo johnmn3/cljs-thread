@@ -1,191 +1,160 @@
-# Documentation Update Plan
+# Documentation & Consolidation Plan
 
-## Overview
+## Constraints
 
-The README and surrounding docs are substantially outdated. They reflect the original Service Worker-only architecture and don't cover:
-
-- **Zero-config `init!`** — the headline UX improvement
-- **Fat Kernel strategy** — blob/eval workers with full runtime inlined
-- **Node.js support** — worker_threads with eval workers
-- **5 worker spawn strategies** — pluggable architecture
-- **SAB sync** — SharedArrayBuffer blocking without Service Worker
-- **COOP/COEP deployment headers** — required for SAB
-- **`:cljs-thread` module naming** — dedicated kernel module convention
-- **Catch-and-load** — transparent module loading for non-exported fns
-- **Advanced compilation support** — dependency chain inlining
+1. **Single strategy**: Consolidate on the fat kernel. Remove strategies 1-4 (self-spawn, blob-bootstrap, eval-kernel, live-kernel).
+2. **Remove experimental tests**: Tests used to explore/develop approaches get deleted. Genuine regression tests stay.
+3. **Keep figwheel/cljs.main stubs**: These will become official paths again.
 
 ---
 
-## Plan
+## Part A: Code Cleanup (before docs)
 
-### 1. README.md — Major Rewrite
+### A1. Remove strategy source files (strategies 1-4)
 
-The README is the primary entry point. It needs a structural overhaul while preserving the excellent API documentation (spawn, in, future, pmap, =>>).
+Delete:
+- `src/cljs_thread/strategy/self_spawn.cljs`
+- `src/cljs_thread/strategy/blob_bootstrap.cljs`
+- `src/cljs_thread/strategy/eval_kernel.cljs`
+- `src/cljs_thread/strategy/live_kernel.cljs`
 
-#### 1a. New "Getting Started" section (replace existing)
+Keep:
+- `src/cljs_thread/strategy/common.cljs` (shared utils, used by fat_kernel)
+- `src/cljs_thread/strategy/fat_kernel.cljs`
 
-**Current state:** Shows only shadow-cljs with Service Worker config, Figwheel/cljs.main stubs.
+### A2. Remove experimental test files
 
-**New content:**
-- **Zero-config quickstart** — the simplest path:
-  ```clojure
-  (ns my-app.core
-    (:require [cljs-thread.core :as thread :refer [spawn in future pmap]]))
+Delete (strategy-specific for removed strategies):
+- `test/cljs_thread/strategy/node_self_spawn_test.cljs`
+- `test/cljs_thread/strategy/node_blob_bootstrap_test.cljs`
+- `test/cljs_thread/strategy/node_eval_kernel_test.cljs`
+- `test/cljs_thread/strategy/node_live_kernel_test.cljs`
+- `test/cljs_thread/strategy_test_browser.cljs`
+- `test/cljs_thread/live_kernel_test_browser.cljs`
 
-  (thread/init!)  ;; That's it — auto-detects everything
-  ```
-- **Minimal shadow-cljs.edn** — single-module build (simplest):
-  ```clojure
-  {:builds
-   {:app {:target :browser
-          :output-dir "resources/public/js"
-          :modules {:app {:init-fn my-app.screen/init!}}}}}
-  ```
-- **Code-split build** — recommended for larger apps (screen + core modules):
-  ```clojure
-  {:builds
-   {:app {:target :browser
-          :output-dir "resources/public/js"
-          :modules
-          {:shared {:entries []}
-           :screen {:init-fn my-app.screen/init!
-                    :depends-on #{:shared}}
-           :core   {:init-fn my-app.core/init!
-                    :depends-on #{:shared}
-                    :web-worker true}}}}}
-  ```
-- **Dedicated kernel module** — advanced, using `:cljs-thread` naming convention
-- **Node.js setup** — `:node-script` target, `(thread/init!)` just works
+Delete (exploratory/proof-of-concept):
+- `test/cljs_thread/sab_sync_test_browser.cljs`
+- `test/cljs_thread/kernel_split_test_browser.cljs`
+- `test/cljs_thread/autoload_test_browser.cljs`
+- `test/cljs_thread/usability_test_browser.cljs`
+- `test/cljs_thread/autoload_fns.cljs`
+- `test/cljs_thread/usability_helpers.cljs`
 
-#### 1b. New "How It Works" section (add after Getting Started)
+Keep (genuine regression tests):
+- `test/cljs_thread/util_test.cljs`
+- `test/cljs_thread/state_test.cljs`
+- `test/cljs_thread/env_test.cljs`
+- `test/cljs_thread/id_test.cljs`
+- `test/cljs_thread/util_browser_test.cljs`
+- `test/cljs_thread/integration_runner.cljs`
+- `test/cljs_thread/integration_core.cljs`
+- `test/cljs_thread/node_runner.cljs`
+- `test/cljs_thread/strategy/node_fat_kernel_test.cljs`
+- `test/cljs_thread/fat_kernel_test_browser.cljs`
+- `test/cljs_thread/fat_kernel_nosplit_test_browser.cljs`
+- `test/cljs_thread/zero_config_test_browser.cljs`
 
-Brief architecture overview:
-- Fat kernel: workers boot with full runtime inlined (blob/eval)
-- SAB sync: SharedArrayBuffer + Atomics for blocking semantics (no SW needed)
-- Catch-and-load: app code loaded on-demand when workers hit ReferenceError
-- Mesh: workers auto-connect to all other nodes
-- Diagram: Screen thread → init! → Root → Core/DB → Future pool
+### A3. Remove experimental e2e specs
 
-#### 1c. Update `init!` documentation (replace existing section)
+Delete:
+- `e2e/strategy.spec.js`
+- `e2e/strategy-nosplit.spec.js`
+- `e2e/autoload.spec.js`
+- `e2e/live-kernel.spec.js`
+- `e2e/sab-sync.spec.js`
+- `e2e/kernel-split.spec.js`
+- `e2e/usability.spec.js`
+- `e2e/usability-nosplit.spec.js`
 
-**Current state:** Only shows explicit SW/core/repl connect strings.
+Keep:
+- `e2e/integration.spec.js`
+- `e2e/cljs-tests.spec.js`
+- `e2e/fat-kernel.spec.js`
+- `e2e/serve.js` (needs port cleanup)
+- `e2e/run-fat-kernel-test.js`
 
-**New content:**
-- Zero-config: `(init!)` — auto-detects from manifest.edn, auto-installs fat-kernel
-- Explicit config: `(init! {:core-connect-string "/core.js"})` — manual worker script
-- Legacy SW mode: `(init! {:sw-connect-string "/sw.js" :core-connect-string "/core.js"})`
-- Full options table: `:core-connect-string`, `:sw-connect-string`, `:repl-connect-string`, `:loadable-modules`, etc.
+### A4. Remove obsolete build targets from shadow-cljs.edn
 
-#### 1d. Add "Deployment" section (new)
+Delete targets:
+- `:node-strategy-1`, `:node-strategy-2`, `:node-strategy-3`, `:node-strategy-4`
+- `:strategy-browser`, `:strategy-browser-sw`
+- `:strategy-nosplit`, `:strategy-nosplit-sw`
+- `:usability-browser`, `:usability-browser-sw`
+- `:usability-nosplit`, `:usability-nosplit-sw`
+- `:autoload-browser`, `:autoload-browser-sw`
+- `:live-kernel-browser`, `:live-kernel-browser-sw`
+- `:sab-sync-browser`
+- `:kernel-split-browser`, `:kernel-standalone`
 
-- **COOP/COEP headers** — required for SAB sync:
-  ```
-  Cross-Origin-Opener-Policy: same-origin
-  Cross-Origin-Embedder-Policy: require-corp
-  ```
-- Explanation of why (SharedArrayBuffer requires cross-origin isolation)
-- Fallback: SW mode still works without these headers
-- Common server configs (Express, Nginx, Cloudflare)
+Keep targets:
+- `:node-test`, `:browser-test`
+- `:integration`, `:integration-sw`
+- `:node-worker`, `:node-integration`
+- `:node-strategy-5`
+- `:fat-kernel-browser`, `:fat-kernel-split-browser`, `:fat-kernel-nosplit-browser`
+- `:zero-config-browser`
 
-#### 1e. Add "Node.js" section (new)
+### A5. Clean up e2e/serve.js
 
-- Setup with shadow-cljs `:node-script` target
-- `(thread/init!)` works identically — uses worker_threads + eval workers
-- Example: parallel computation on Node
+Remove port mappings for deleted test modes.
 
-#### 1f. Update "Platforms & Browser Support"
+### A6. Remove internal plan docs
 
-- Chrome/Edge: full support (SAB + fat kernel)
-- Firefox: full support (SAB + fat kernel)
-- Safari: SW fallback (SAB restricted in workers)
-- Node.js: full support (worker_threads)
+Delete:
+- `FAT_KERNEL_PLAN.md`
+- `LIVE_KERNEL_PLAN.md`
 
-#### 1g. Preserve existing API sections
+---
 
-Keep spawn, in, future, pmap, =>> sections largely as-is. They are well-written. Minor updates:
-- Remove "20 milliseconds" timing claims (varies by strategy)
-- Add Node.js notes where relevant (e.g., deref returns value directly, not promise)
-- Update performance notes to reflect SAB vs SW differences
+## Part B: Documentation
 
-#### 1h. Update "Some history" section
+### B1. README.md — Major Rewrite
 
-- Add fat kernel evolution story: SW → live kernel → fat kernel
-- Mention that SW is now optional (SAB sync replaces it)
-- Update tau.alpha/tau.beta references if needed
+Structure:
+1. Title + tagline
+2. Getting Started (zero-config quickstart)
+3. Build Configuration (shadow-cljs, figwheel, cljs.main)
+4. `init!` (zero-config, explicit, legacy SW)
+5. How It Works (brief architecture)
+6. Demo
+7. API Reference (spawn, in, future, pmap, =>>)
+8. Stepping Debugger
+9. Deployment (COOP/COEP headers, server examples)
+10. Node.js
+11. Platform Support
+12. History
 
-#### 1i. Remove stale content
+Key changes:
+- Lead with zero-config `(thread/init!)`
+- Keep figwheel/cljs.main stubs (becoming official)
+- Preserve API sections (well-written)
+- Add deployment/headers guidance
+- Add Node.js section
+- No strategy comparison (single strategy)
 
-- Remove Figwheel/cljs.main "forthcoming" stubs
-- Remove outdated timing claims
-- Remove "eventually I'd like to minimize build tool configuration" — it's done now
+### B2. ARCHITECTURE.md
 
-### 2. New: ARCHITECTURE.md
+Concise internals doc:
+- Fat kernel: how workers boot
+- SAB sync vs SW sync
+- Module system (code-split, single-module, catch-and-load)
+- `:cljs-thread` dedicated kernel module
+- Platform abstraction (Browser/Node)
+- Worker mesh topology
 
-Create a concise architecture document covering the internals:
+### B3. DEPLOYMENT.md
 
-- **Worker spawn strategies** — comparison table:
-  | Strategy | Mechanism | SW Required | Config Required | Best For |
-  |----------|-----------|-------------|-----------------|----------|
-  | Self-Spawn | URL worker | Yes | Full | Legacy |
-  | Blob Bootstrap | Blob + importScripts | Yes | Moderate | — |
-  | Eval Kernel | Eval + load-scripts | No | Moderate | — |
-  | Live Kernel | Eval + catch-and-load | No | Moderate | — |
-  | Fat Kernel | Blob/eval with full runtime | No | Zero | Default |
-
-- **Sync mechanisms**:
-  - SAB sync: SharedArrayBuffer + Atomics.wait/waitAsync (preferred)
-  - SW sync: Service Worker intercepts XHR, proxies to coordinator (legacy)
-
-- **Module system**:
-  - Code-split builds: shared.js + screen.js + core.js
-  - Single-module builds: app.js
-  - Catch-and-load: transparent IIFE unwrapping for non-exported fns
-  - `:cljs-thread` module naming convention
-
-- **Platform abstraction**: `platform.cljs` — unified API for Browser/Node
-
-- **Message mesh**: fully connected worker mesh, `msg.cljs`
-
-### 3. New: DEPLOYMENT.md
-
-Focused guide on deploying cljs-thread apps:
-
-- **Development** — `npx shadow-cljs watch app` with default server (no special headers needed for SW mode)
-- **Production with SAB** — COOP/COEP headers, server configuration examples
-- **Production without SAB** — Service Worker fallback, SW file serving
-- **CDN considerations** — CORS headers for cross-origin scripts
-- **Troubleshooting** — common issues:
-  - "SharedArrayBuffer is not defined" → missing COOP/COEP headers
-  - Workers fail to load → check Content-Security-Policy
-  - Blob worker origin:null → library handles with absolute URLs
-
-### 4. Update shadow_dashboard example
-
-The demo app's build config is outdated. Update:
-- `shadow-cljs.edn` to show modern `:cljs-thread` module pattern
-- Screen init to use zero-config `(thread/init!)`
-- Add comments explaining the build structure
-
-### 5. Clean up internal plan docs
-
-- `FAT_KERNEL_PLAN.md` — Mark as "COMPLETED" or move to `docs/design/` directory
-- `LIVE_KERNEL_PLAN.md` — Same treatment
-- These are valuable design documents but shouldn't be top-level in the repo
+Practical deployment guide:
+- COOP/COEP headers (required for SAB)
+- Server configs (Express, Nginx, Cloudflare)
+- SW fallback for environments without SAB
+- Troubleshooting common issues
 
 ---
 
 ## Implementation Order
 
-1. **README.md rewrite** — highest impact, first priority
-2. **ARCHITECTURE.md** — helps contributors and advanced users
-3. **DEPLOYMENT.md** — practical ops guide
-4. **shadow_dashboard updates** — working example
-5. **Plan doc cleanup** — housekeeping
-
----
-
-## What NOT to change
-
-- The API sections (spawn, in, future, pmap, =>>, dbg/break) — well-written, mostly accurate
-- Test files — not user-facing documentation
-- Source code comments — already good
+1. A1-A6: Code cleanup (remove files, clean build config)
+2. B1: README.md rewrite
+3. B2: ARCHITECTURE.md
+4. B3: DEPLOYMENT.md
