@@ -48,6 +48,18 @@
         (subs source (inc nl-idx))
         source))
     source))
+
+(defn- strip-import-scripts
+  "Remove importScripts(...) calls from source. When we inline all
+   dependency modules into the blob, the importScripts calls at the
+   top of child modules (e.g. importScripts('shared.js') in core.js)
+   are no longer needed — the code is already present."
+  [source]
+  (if (string? source)
+    (.replace source
+              (js/RegExp. "^\\s*importScripts\\([^)]*\\);?\\s*\\n?" "gm")
+              "")
+    source))
 (defonce ^:private kernel-origin (atom nil))
 (defonce ^:private loadable-modules-config (atom nil))
 ;; Whether to include kernel source in workers for child-spawning
@@ -81,6 +93,21 @@
       (when-let [src (first srcs)]
         (common/detect-base-url src)))))
 
+(defn- resolve-dependency-chain
+  "Given a module and the by-id map, return module output names in
+   dependency order (deps first, then the module itself). Excludes
+   :screen (page-only module)."
+  [mod by-id]
+  (let [deps (:depends-on mod)]
+    (if (seq deps)
+      (into [] (concat
+                (mapcat #(when-let [dep-mod (get by-id %)]
+                           (when (not= % :screen)
+                             (resolve-dependency-chain dep-mod by-id)))
+                        deps)
+                [(:output-name mod)]))
+      [(:output-name mod)])))
+
 (defn- detect-kernel-from-manifest
   "Try to fetch and parse manifest.edn from the build output directory.
    Returns a map {:kernel-urls [...] :screen-name \"...\"} or nil.
@@ -93,14 +120,13 @@
 
    Detection priority:
    1. :cljs-thread — dedicated kernel module (user-provided, stable name)
-   2. :core        — worker-safe bootstrap in code-split builds
+   2. :core + deps — worker-safe bootstrap + full dependency chain
    3. Single module — the only module IS the runtime
    4. :shared      — fallback for multi-module builds without :core
 
-   IMPORTANT: In code-split builds, :shared and :screen modules use the
-   browser bootstrap (requires document). The :core module uses the
-   web-worker bootstrap (uses self, importScripts). For blob workers we
-   MUST use a worker-safe module."
+   For code-split builds with :core, the full dependency chain is
+   returned (e.g. [shared.js, core.js]) so that :advanced builds work
+   in blob workers without importScripts."
   [base-url]
   (when-let [manifest-text (fetch-text-sync (str base-url "manifest.edn"))]
     (try
@@ -112,19 +138,19 @@
             core-mod (:core by-id)]
         (cond
           ;; Dedicated :cljs-thread module — the user-provided kernel.
-          ;; This is the stable, well-known module name. Users add it to
-          ;; their shadow-cljs config:
-          ;;   :modules {:cljs-thread {:entries [cljs-thread.core]
-          ;;                           :web-worker true}
-          ;;             ...}
+          ;; Self-contained, no dependency chain needed.
           ct-mod
           {:kernel-urls [(str base-url (:output-name ct-mod))]
            :screen-name (when screen-mod (:output-name screen-mod))}
 
-          ;; Standard code-split: use :core module (has worker-safe bootstrap)
+          ;; Standard code-split: use :core module + its full dependency
+          ;; chain. In :advanced mode, core.js calls importScripts("shared.js")
+          ;; which fails in blobs. Including shared.js inline solves this.
           core-mod
-          {:kernel-urls [(str base-url (:output-name core-mod))]
-           :screen-name (when screen-mod (:output-name screen-mod))}
+          (let [chain (resolve-dependency-chain core-mod by-id)
+                urls (mapv #(str base-url %) chain)]
+            {:kernel-urls urls
+             :screen-name (when screen-mod (:output-name screen-mod))})
 
           ;; Single-module build — the only module IS the runtime.
           (= 1 (count modules))
@@ -166,16 +192,42 @@
         :else
         nil))))
 
+(defn- needs-deps-inlined?
+  "Check if a module source needs its dependencies inlined (advanced mode).
+   In :advanced mode, module JS starts with importScripts('dep.js').
+   In :none mode, each module has its own SHADOW_ENV bootstrap and uses
+   goog.require (resolved by the importScripts wrapper)."
+  [source]
+  (and (string? source)
+       (boolean (re-find #"^\s*importScripts\(" source))))
+
 (defn- extract-kernel-source-browser!
   "Detect and fetch the kernel source in a browser environment.
-   Tries manifest.edn first, falls back to script tag detection."
+   Tries manifest.edn first, falls back to script tag detection.
+
+   In :none mode: uses only the primary module (web-worker bootstrap).
+   In :advanced mode: inlines the full dependency chain (shared.js +
+   core.js) to avoid importScripts from blob workers."
   []
   (let [base-url (detect-base-url-from-scripts)
         detected (or (when base-url (detect-kernel-from-manifest base-url))
                      (detect-kernel-from-script-tags))]
     (when detected
       (let [{:keys [kernel-urls screen-name]} detected
-            sources (keep fetch-text-sync kernel-urls)
+            ;; Fetch the primary module (last in dep chain) first
+            primary-source (fetch-text-sync (last kernel-urls))
+            ;; If the primary starts with importScripts, inline all deps.
+            ;; This handles :advanced mode where modules start with
+            ;; importScripts("shared.js"). In :none mode, modules have
+            ;; their own SHADOW_ENV bootstraps — only use the primary.
+            sources (if (and (> (count kernel-urls) 1)
+                            (needs-deps-inlined? primary-source))
+                      ;; Advanced: fetch deps + strip importScripts from primary
+                      (let [dep-sources (keep fetch-text-sync (butlast kernel-urls))]
+                        (concat dep-sources
+                                [(strip-import-scripts primary-source)]))
+                      ;; Dev: just the primary module
+                      (if primary-source [primary-source] []))
             combined (apply str sources)]
         (when (seq combined)
           (reset! kernel-source combined)
