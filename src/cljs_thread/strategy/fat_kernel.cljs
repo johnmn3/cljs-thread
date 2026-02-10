@@ -120,7 +120,13 @@
           {:kernel-urls [(str base-url (:output-name core-mod))]
            :screen-name (when screen-mod (:output-name screen-mod))}
 
-          ;; Single-module build — the only module IS the runtime
+          ;; Single-module build — the only module IS the runtime.
+          ;; Could be :shared (code-split with no :core) or any other name (:app).
+          (= 1 (count modules))
+          {:kernel-urls [(str base-url (:output-name (first modules)))]
+           :screen-name nil}
+
+          ;; Multi-module build with :shared but no :core — use :shared
           shared-mod
           {:kernel-urls [(str base-url (:output-name shared-mod))]
            :screen-name nil}

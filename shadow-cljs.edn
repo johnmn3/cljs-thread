@@ -209,4 +209,10 @@
                          :depends-on #{:shared}}
                 :core   {:init-fn    cljs-thread.integration-core/init!
                          :depends-on #{:shared :kernel}
-                         :web-worker true}}}}}
+                         :web-worker true}}}
+  ;; Fat Kernel non-code-split browser tests: single module
+  :fat-kernel-nosplit-browser
+  {:target     :browser
+   :output-dir "target/fat-kernel-nosplit-test"
+   :modules    {:app {:init-fn    cljs-thread.fat-kernel-nosplit-test-browser/init!
+                      :web-worker true}}}}}}
