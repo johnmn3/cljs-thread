@@ -86,42 +86,47 @@
    Returns a map {:kernel-urls [...] :screen-name \"...\"} or nil.
 
    shadow-cljs writes manifest.edn to :output-dir with entries like:
-     [{:module-id :kernel :output-name \"kernel.js\" ...}
-      {:module-id :shared :output-name \"shared.js\" ...}
-      {:module-id :screen :output-name \"screen.js\" ...}
-      {:module-id :core   :output-name \"core.js\" ...}]
+     [{:module-id :cljs-thread :output-name \"cljs-thread.js\" ...}
+      {:module-id :shared      :output-name \"shared.js\" ...}
+      {:module-id :screen      :output-name \"screen.js\" ...}
+      {:module-id :core        :output-name \"core.js\" ...}]
+
+   Detection priority:
+   1. :cljs-thread — dedicated kernel module (user-provided, stable name)
+   2. :core        — worker-safe bootstrap in code-split builds
+   3. Single module — the only module IS the runtime
+   4. :shared      — fallback for multi-module builds without :core
 
    IMPORTANT: In code-split builds, :shared and :screen modules use the
    browser bootstrap (requires document). The :core module uses the
    web-worker bootstrap (uses self, importScripts). For blob workers we
-   MUST use :core as the kernel source — it is self-contained and
-   worker-safe."
+   MUST use a worker-safe module."
   [base-url]
   (when-let [manifest-text (fetch-text-sync (str base-url "manifest.edn"))]
     (try
       (let [modules (edn/read-string manifest-text)
             by-id (into {} (map (juxt :module-id identity)) modules)
-            kernel-mod (:kernel by-id)
+            ct-mod (:cljs-thread by-id)
             shared-mod (:shared by-id)
             screen-mod (:screen by-id)
             core-mod (:core by-id)]
         (cond
-          ;; Dedicated :kernel module exists — use kernel.js as the runtime.
-          ;; In code-split builds with a kernel module, the kernel module
-          ;; should also be compiled with :web-worker true for worker safety.
-          kernel-mod
-          {:kernel-urls [(str base-url (:output-name kernel-mod))]
+          ;; Dedicated :cljs-thread module — the user-provided kernel.
+          ;; This is the stable, well-known module name. Users add it to
+          ;; their shadow-cljs config:
+          ;;   :modules {:cljs-thread {:entries [cljs-thread.core]
+          ;;                           :web-worker true}
+          ;;             ...}
+          ct-mod
+          {:kernel-urls [(str base-url (:output-name ct-mod))]
            :screen-name (when screen-mod (:output-name screen-mod))}
 
           ;; Standard code-split: use :core module (has worker-safe bootstrap)
-          ;; :core is self-contained in :none mode, and includes shared deps
-          ;; in :advanced mode. :shared has browser bootstrap — unsafe for blobs.
           core-mod
           {:kernel-urls [(str base-url (:output-name core-mod))]
            :screen-name (when screen-mod (:output-name screen-mod))}
 
           ;; Single-module build — the only module IS the runtime.
-          ;; Could be :shared (code-split with no :core) or any other name (:app).
           (= 1 (count modules))
           {:kernel-urls [(str base-url (:output-name (first modules)))]
            :screen-name nil}
@@ -212,11 +217,11 @@
               (let [manifest-text (.readFileSync fs manifest-path "utf8")
                     modules (edn/read-string manifest-text)
                     by-id (into {} (map (juxt :module-id identity)) modules)
-                    kernel-mod (:kernel by-id)
+                    ct-mod (:cljs-thread by-id)
                     shared-mod (:shared by-id)]
-                (if kernel-mod
-                  ;; Dedicated kernel module
-                  (let [kernel-path (.resolve path base-dir (:output-name kernel-mod))
+                (if ct-mod
+                  ;; Dedicated :cljs-thread kernel module
+                  (let [kernel-path (.resolve path base-dir (:output-name ct-mod))
                         shared-path (when shared-mod
                                       (.resolve path base-dir (:output-name shared-mod)))
                         ksource (.readFileSync fs kernel-path "utf8")

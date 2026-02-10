@@ -198,18 +198,21 @@
                 :core   {:init-fn    cljs-thread.integration-core/init!
                          :depends-on #{:shared}
                          :web-worker true}}}
-  ;; Fat Kernel browser tests with kernel-split: dedicated kernel module
+  ;; Fat Kernel browser tests with kernel-split: dedicated :cljs-thread module
+  ;; This is the recommended user-facing pattern: a dedicated module named
+  ;; :cljs-thread that bundles all of cljs-thread's runtime into a single
+  ;; artifact. The fat-kernel strategy auto-detects this module name.
   :fat-kernel-split-browser
   {:target     :browser
    :output-dir "target/fat-kernel-split-test"
-   :modules    {:kernel {:entries [cljs-thread.core]}
-                :shared {:entries []
-                         :depends-on #{:kernel}}
-                :screen {:init-fn    cljs-thread.fat-kernel-test-browser/init!
-                         :depends-on #{:shared}}
-                :core   {:init-fn    cljs-thread.integration-core/init!
-                         :depends-on #{:shared :kernel}
-                         :web-worker true}}}
+   :modules    {:cljs-thread {:entries [cljs-thread.core]}
+                :shared      {:entries []
+                              :depends-on #{:cljs-thread}}
+                :screen      {:init-fn    cljs-thread.fat-kernel-test-browser/init!
+                              :depends-on #{:shared}}
+                :core        {:init-fn    cljs-thread.integration-core/init!
+                              :depends-on #{:shared :cljs-thread}
+                              :web-worker true}}}
   ;; Fat Kernel non-code-split browser tests: single module
   :fat-kernel-nosplit-browser
   {:target     :browser
