@@ -87,9 +87,34 @@
       (.then #(check "transducer" 25 %))
       (.catch #(fail! "transducer" (str "error: " %)))))
 
+(defn test-contention []
+  "Concurrent futures — verifies no deadlock under contention."
+  (let [n 10
+        futures (mapv (fn [i] @(future (+ i 1))) (range n))]
+    (-> (js/Promise.all (into-array futures))
+        (.then (fn [results]
+                 (let [expected (mapv inc (range n))
+                       actual (vec results)]
+                   (check "contention" expected actual))))
+        (.catch #(fail! "contention" (str "error: " %))))))
+
+(defn test-spawn-throughput []
+  "Measure time for N sequential spawns."
+  (let [start (.now js/Date)
+        n 5]
+    (-> (reduce (fn [p i]
+                  (.then p (fn [_] @(spawn (+ i 1)))))
+                (js/Promise.resolve nil)
+                (range n))
+        (.then (fn [_]
+                 (let [elapsed (- (.now js/Date) start)]
+                   (println (str "  PERF: " n " sequential spawns in " elapsed "ms"))
+                   (check "throughput" true (< elapsed 15000)))))
+        (.catch #(fail! "throughput" (str "error: " %))))))
+
 (defn run-tests! []
-  (println "Running all 8 integration tests...")
-  (js/setTimeout #(do (println "\nTIMEOUT") (finish!)) 45000)
+  (println "Running all 10 integration tests...")
+  (js/setTimeout #(do (println "\nTIMEOUT") (finish!)) 60000)
   (-> (test-spawn-ephemeral)
       (.then test-spawn-nested)
       (.then test-in-named)
@@ -98,6 +123,8 @@
       (.then test-future-nested)
       (.then test-pmap)
       (.then test-transducer)
+      (.then test-contention)
+      (.then test-spawn-throughput)
       (.then #(do (println "All tests complete.") (finish!)))
       (.catch #(do (fail! "fatal" (str %)) (finish!)))))
 
