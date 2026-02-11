@@ -10,6 +10,7 @@ const PORT = mode === "integration-test" ? 9091
   : mode === "fat-kernel-split-test" ? 9101
   : mode === "fat-kernel-nosplit-test" ? 9102
   : mode === "zero-config-test" ? 9103
+  : mode === "walkthrough-test" ? 9104
   : 9090;
 
 const MIME = {
@@ -35,7 +36,7 @@ const server = http.createServer((req, res) => {
       "Content-Type": MIME[ext] || "application/octet-stream",
     };
     // Cross-origin isolation headers required for SharedArrayBuffer
-    if (mode === "integration-test" || mode === "fat-kernel-test" || mode === "fat-kernel-split-test" || mode === "fat-kernel-nosplit-test" || mode === "zero-config-test") {
+    if (mode === "integration-test" || mode === "fat-kernel-test" || mode === "fat-kernel-split-test" || mode === "fat-kernel-nosplit-test" || mode === "zero-config-test" || mode === "walkthrough-test") {
       headers["Cross-Origin-Opener-Policy"] = "same-origin";
       headers["Cross-Origin-Embedder-Policy"] = "credentialless";
     }

@@ -3,24 +3,19 @@
    [reagent.dom :as rdom]
    [comp.el :as c]
    [cljs-thread.core :as thread]
+   [cljs-thread.env :as env]
    [cljs-thread.re-frame :refer [subscribe]]
    [dashboard.routes :as routes]
    [dashboard.shell :as shell]))
 
 ;;; Config
 (enable-console-print!)
-; for docs release
-;; #_
-(thread/init!
- {:sw-connect-string "/cljs-thread/sw.js"
-  :repl-connect-string "/cljs-thread/repl.js"
-  :core-connect-string "/cljs-thread/core.js"})
 
-#_
-(thread/init!
- {:sw-connect-string "/sw.js"
-  :repl-connect-string "/repl.js"
-  :core-connect-string "/core.js"})
+;; Zero-config: auto-detects worker scripts from manifest.edn,
+;; auto-installs fat-kernel strategy when SAB is available.
+;; Guard needed: workers load screen.js via catch-and-load.
+(when (env/in-screen?)
+  (thread/init!))
 
 (def debug?
   ^boolean goog.DEBUG)
@@ -53,5 +48,6 @@
                (.getElementById js/document "app")))
 
 (defn init! []
-  (dev-setup)
-  (mount-root))
+  (when (env/in-screen?)
+    (dev-setup)
+    (mount-root)))

@@ -81,4 +81,14 @@
                          :depends-on #{:shared}}
                 :core   {:init-fn    cljs-thread.integration-core/init!
                          :depends-on #{:shared}
+                         :web-worker true}}}
+  ;; Walkthrough tests: exercises all API examples from the docs
+  :walkthrough-browser
+  {:target     :browser
+   :output-dir "target/walkthrough-test"
+   :modules    {:shared {:entries []}
+                :screen {:init-fn    cljs-thread.walkthrough-test-browser/init!
+                         :depends-on #{:shared}}
+                :core   {:init-fn    cljs-thread.integration-core/init!
+                         :depends-on #{:shared}
                          :web-worker true}}}}}

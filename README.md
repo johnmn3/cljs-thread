@@ -73,7 +73,7 @@ For the best separation, you can provide a dedicated `:cljs-thread` kernel modul
 
 By having a `:screen` module, you can more easily separate your "main thread" code from your web worker code. Having a separate service worker artifact (`:sw`) is optional — it's only needed if you can't use COOP/COEP headers (see [Deployment](#deployment)).
 
-The sub-project in this repo — `shadow_dashboard` — has an example project with a working build config that you can use as a reference.
+The sub-project in this repo — `shadow_dashboard` — has an example project with a working build config that you can use as a reference. See the **[API Walkthrough](WALKTHROUGH.md)** for a comprehensive, tested guide to every `cljs-thread` API.
 
 To launch the project in Calva, type `shift-cmd-p` and choose _"Start a Project REPL and Connect"_ and then enable the build options that come up. You can choose which build your are connected to by typing `shift-cmd-p` and choosing _"Select CLJS Build Connection"_.
 
