@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Reagami Counter — EVE + DOM Proxy</title>
+  <!-- COI Service Worker must load first — registers SW, reloads page with
+       COOP/COEP headers so SharedArrayBuffer is available on GitHub Pages. -->
+  <script src="coi-serviceworker.js"></script>
   <style>
     body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
     h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
@@ -70,9 +73,6 @@
 &lt;script src=<span class="str">"cljs-thread.js"</span>&gt;&lt;/script&gt;
 &lt;script src=<span class="str">"screen.js"</span>&gt;&lt;/script&gt;
 &lt;script&gt;<span class="sym">cljs_thread</span>.<span class="fn">main</span>(<span class="sym">reagami_counter</span>.<span class="sym">core</span>.<span class="fn">main</span>)&lt;/script&gt;</pre>
-
-  <!-- COI Service Worker for SharedArrayBuffer on GitHub Pages -->
-  <script src="coi-serviceworker.js"></script>
 
   <!-- canvas-confetti for the celebration at 10 clicks -->
   <script src="confetti.min.js"></script>
