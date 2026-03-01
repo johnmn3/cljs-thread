@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Reagami Counter — EVE + DOM Proxy (DEV)</title>
+  <script src="../coi-serviceworker.js"></script>
   <style>
     body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
     h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
@@ -76,14 +77,8 @@
   <!-- Shim importScripts for main thread — :web-worker true builds
        emit importScripts() at the top. Workers have it natively. -->
   <script>if(typeof importScripts==="undefined")importScripts=function(){}</script>
-  <!-- :cljs-thread module — fat kernel auto-detects this as worker kernel.
-       Must appear before coi-serviceworker.js so detect-kernel-url-browser!
-       probes this directory (dev/) first and finds the dev manifest.edn. -->
   <script src="cljs-thread.js"></script>
   <script src="screen.js"></script>
-  <!-- COI Service Worker for SharedArrayBuffer on GitHub Pages.
-       Loaded after cljs-thread.js so kernel URL detection probes dev/ first. -->
-  <script src="../coi-serviceworker.js"></script>
   <script>cljs_thread.main(reagami_counter.core.main)</script>
 </body>
 </html>

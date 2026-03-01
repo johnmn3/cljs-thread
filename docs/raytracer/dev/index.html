@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>EVE Ray Tracer — Dev Mode</title>
+  <script src="../coi-serviceworker.js"></script>
   <link rel="stylesheet" href="../css/style.css">
 </head>
 <body>
@@ -98,7 +99,5 @@
   <!-- Dev build: single module -->
   <script src="main.js"></script>
   <script>cljs_thread.main(raytracer.main.main)</script>
-  <!-- COI Service Worker for SharedArrayBuffer on GitHub Pages -->
-  <script src="../coi-serviceworker.js"></script>
 </body>
 </html>
