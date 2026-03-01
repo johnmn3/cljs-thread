@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add X-RAY storage model invariant checker with video trace"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           8000
+ :benchmark     "contention-scaling-read-only"
+ :ms-per-op     0.007159205250000014
+ :label         "read-only contention"
+ :commit        "bce9e7f"
+ :elapsed-ms    57.27364200000011
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T03:50:31.956Z"
+ :detail        {:stock-throughput 1081961.2711961896, :scaling [{:workers 1, :ms 42.46321199999875, :throughput 188398.37174823787, :ratio 0.17412672409239685} {:workers 2, :ms 40.4450680000009, :throughput 197799.14821752362, :ratio 0.1828153682421939} {:workers 4, :ms 42.63116499999887, :throughput 187656.14310564141, :ratio 0.17344072112504863} {:workers 8, :ms 43.068428999999014, :throughput 185750.9128090134, :ratio 0.17167981678646574} {:workers 16, :ms 57.27364200000011, :throughput 139680.30878846475, :ratio 0.12909917619697947}]}}

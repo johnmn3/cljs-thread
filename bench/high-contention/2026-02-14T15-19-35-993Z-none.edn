@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add bench results from 2026-02-14 test runs"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           9
+ :benchmark     "high-contention"
+ :ms-per-op     23.40942899999997
+ :label         "contention"
+ :commit        "afc32be"
+ :elapsed-ms    210.68486099999973
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T15:19:35.993Z"
+ :detail        {:counter 9, :expected 9}}

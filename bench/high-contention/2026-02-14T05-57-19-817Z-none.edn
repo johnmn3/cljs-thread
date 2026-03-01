@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add X-RAY documentation and README section"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           9
+ :benchmark     "high-contention"
+ :ms-per-op     5.69535755555565
+ :label         "contention"
+ :commit        "464c450"
+ :elapsed-ms    51.25821800000085
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T05:57:19.817Z"
+ :detail        {:counter 9, :expected 9}}

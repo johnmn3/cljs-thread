@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add bench test files and intermediate bench results"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           5
+ :benchmark     "nested-atom-swap-chain"
+ :ms-per-op     3.2634870000001683
+ :result        5
+ :label         "chained read-swap-push"
+ :commit        "f307f96"
+ :elapsed-ms    16.31743500000084
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T02:22:01.271Z"}

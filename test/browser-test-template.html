@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>cljs-thread Browser Test</title>
+  <style>
+    body { background: #0d1117; color: #c9d1d9; font-family: monospace; padding: 1em; }
+    #status { font-size: 1.4em; padding: 0.5em; margin: 1em 0; }
+    #status.running { background: #1a1a2e; color: #58a6ff; }
+    #status.pass { background: #0d3b1e; color: #3fb950; }
+    #status.fail { background: #3b1012; color: #f85149; }
+    #log { max-height: 60vh; overflow-y: auto; }
+    pre { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>cljs-thread Browser Test</h1>
+  <div id="status" class="running">Initializing...</div>
+  <div id="results"></div>
+  <pre id="log"></pre>
+  <script src="shared.js"></script>
+  <script src="screen.js"></script>
+</body>
+</html>

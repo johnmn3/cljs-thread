@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Epoch-safe GC: fix concurrent reader data races in swap!/retire paths"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           15
+ :benchmark     "multi-key-contention"
+ :ms-per-op     11.153757133333299
+ :label         "multi-key contention"
+ :commit        "447e25c"
+ :elapsed-ms    167.30635699999948
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T06:55:23.902Z"
+ :detail        {:total 15, :expected 15, :keys-present 3}}

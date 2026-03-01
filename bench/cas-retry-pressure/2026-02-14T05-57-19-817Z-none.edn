@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add X-RAY documentation and README section"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           12
+ :benchmark     "cas-retry-pressure"
+ :ms-per-op     1.7980156666667426
+ :label         "CAS pressure"
+ :commit        "464c450"
+ :elapsed-ms    21.57618800000091
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T05:57:19.817Z"
+ :detail        {:counter 12, :expected 12}}

@@ -1,0 +1,11 @@
+{:passed        true
+ :commit-msg    "Epoch-safe GC: fix concurrent reader data races in swap!/retire paths"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "worker-relay-swaps"
+ :result        3
+ :label         "3-hop relay"
+ :commit        "447e25c"
+ :elapsed-ms    420.5519540000005
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T07:48:17.791Z"}

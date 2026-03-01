@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add bench test files and intermediate bench results"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           15
+ :benchmark     "multi-key-contention"
+ :ms-per-op     5.630385599999984
+ :label         "multi-key contention"
+ :commit        "f307f96"
+ :elapsed-ms    84.45578399999977
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T03:02:49.998Z"
+ :detail        {:total 15, :expected 15, :keys-present 3}}

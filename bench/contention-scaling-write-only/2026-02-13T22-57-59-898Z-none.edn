@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Port contention scaling benchmarks from parent repo to cljs-thread bench framework"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           200
+ :benchmark     "contention-scaling-write-only"
+ :ms-per-op     1.8733865700000023
+ :label         "write-only contention"
+ :commit        "ac9a83e"
+ :elapsed-ms    374.6773140000005
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-13T22:57:59.898Z"
+ :detail        {:stock-throughput 142065.63432306208, :scaling [{:workers 1, :ms 591.8009360000005, :throughput 337.9514763052011, :ratio 0.0023788404417122294} {:workers 2, :ms 412.00737800000024, :throughput 485.4282002687823, :ratio 0.0034169291016918424} {:workers 4, :ms 374.6773140000005, :throughput 533.7926597819044, :ratio 0.0037573665322046972}]}}

@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Fix CLJS shadow-rename IIFE mismatch in future/in/spawn macros"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           8000
+ :benchmark     "contention-scaling-read-only"
+ :ms-per-op     0.03441849487499996
+ :label         "read-only contention"
+ :commit        "a94c92e"
+ :elapsed-ms    275.3479589999997
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T00:54:27.720Z"
+ :detail        {:stock-throughput 870986.8193564209, :scaling [{:workers 1, :ms 117.44831599999998, :throughput 68115.06773753998, :ratio 0.07820447591603137} {:workers 2, :ms 118.56028900000001, :throughput 67476.21878688234, :ratio 0.07747099874225542} {:workers 4, :ms 92.39687000000049, :throughput 86583.01953302052, :ratio 0.09940795613531489} {:workers 8, :ms 107.4284319999997, :throughput 74468.18175657652, :ratio 0.08549863224291} {:workers 16, :ms 275.3479589999997, :throughput 29054.1467205864, :ratio 0.03335773409528142}]}}

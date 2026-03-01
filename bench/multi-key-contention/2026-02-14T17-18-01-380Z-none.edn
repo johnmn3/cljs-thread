@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Fix 3 concurrency bugs: per-SAB epoch slots, deref epoch protection, post-order retire walk"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           15
+ :benchmark     "multi-key-contention"
+ :ms-per-op     19.37122366666675
+ :label         "multi-key contention"
+ :commit        "dbd3293"
+ :elapsed-ms    290.56835500000125
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T17:18:01.380Z"
+ :detail        {:total 15, :expected 15, :keys-present 3}}

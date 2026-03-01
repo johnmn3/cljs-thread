@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add bench results from 2026-02-14 test runs"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           12
+ :benchmark     "spawn-storm"
+ :ms-per-op     47.98489558333328
+ :label         "spawn-storm"
+ :commit        "afc32be"
+ :elapsed-ms    575.8187469999993
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T16:18:23.296Z"
+ :detail        {:counter 12, :expected 12}}

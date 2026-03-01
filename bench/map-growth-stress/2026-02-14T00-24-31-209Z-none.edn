@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Fix CLJS shadow-rename IIFE mismatch in future/in/spawn macros"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           15
+ :benchmark     "map-growth-stress"
+ :ms-per-op     4.663325000000016
+ :label         "map-growth"
+ :commit        "a94c92e"
+ :elapsed-ms    69.94987500000025
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T00:24:31.209Z"
+ :detail        {:key-count 15, :expected-keys 15}}

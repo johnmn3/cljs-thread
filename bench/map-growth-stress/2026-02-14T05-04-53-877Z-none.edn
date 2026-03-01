@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add X-RAY documentation and README section"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           15
+ :benchmark     "map-growth-stress"
+ :ms-per-op     5.085493733333351
+ :label         "map-growth"
+ :commit        "464c450"
+ :elapsed-ms    76.28240600000026
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T05:04:53.877Z"
+ :detail        {:key-count 15, :expected-keys 15}}

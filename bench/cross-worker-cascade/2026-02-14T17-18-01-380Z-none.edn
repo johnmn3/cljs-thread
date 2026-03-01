@@ -1,0 +1,9 @@
+{:passed        false
+ :commit-msg    "Fix 3 concurrency bugs: per-SAB epoch slots, deref epoch protection, post-order retire walk"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "cross-worker-cascade"
+ :commit        "dbd3293"
+ :error         "#error {:message \"Error in remote call\", :data {:results \"{:error \\\"#error {:message \\\\\\\"Error in remote call\\\\\\\", :data {:result \\\\\\\"{:error \\\\\\\\\\\\\\\"#object[Error Error: Vec allocation failed: :out-of-memory]\\\\\\\\\\\\\\\"}\\\\\\\"}}\\\"}\"}}"
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T17:18:01.380Z"}

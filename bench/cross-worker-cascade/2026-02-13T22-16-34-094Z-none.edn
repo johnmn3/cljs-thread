@@ -1,0 +1,11 @@
+{:passed        true
+ :commit-msg    "Add comprehensive test suite for CPS continuation combinators"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "cross-worker-cascade"
+ :result        3
+ :label         "3-worker cascade"
+ :commit        "b867717"
+ :elapsed-ms    300.89545499999986
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-13T22:16:34.094Z"}

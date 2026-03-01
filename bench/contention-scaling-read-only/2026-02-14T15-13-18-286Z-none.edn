@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add bench results from 2026-02-14 test runs"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           8000
+ :benchmark     "contention-scaling-read-only"
+ :ms-per-op     0.00584352299999955
+ :label         "read-only contention"
+ :commit        "afc32be"
+ :elapsed-ms    46.7481839999964
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T15:13:18.286Z"
+ :detail        {:stock-throughput 507462.39307220315, :scaling [{:workers 1, :ms 47.41956699999719, :throughput 168706.7281740568, :ratio 0.33245168603075725} {:workers 2, :ms 45.767235999999684, :throughput 174797.53420110524, :ratio 0.344454163672843} {:workers 4, :ms 39.99594900000375, :throughput 200020.25705151414, :ratio 0.39415779333042067} {:workers 8, :ms 49.71285200001148, :throughput 160924.18113525558, :ratio 0.31711548152566027} {:workers 16, :ms 46.7481839999964, :throughput 171129.6421696427, :ratio 0.33722625460699684}]}}

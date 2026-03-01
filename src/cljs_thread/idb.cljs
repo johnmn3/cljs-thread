@@ -35,22 +35,26 @@
                                    (yield {:res res})))))))
 
 (defn startup []
-  (let [request (.open js/indexedDB idb-key 1)]
-    (set! (.-onerror request) #(do (println :idb-open-error %)))
-    (set! (.-onsuccess request)
-          #(do (reset! s/idb (-> % .-target .-result))
-               (reset! open? true)))
-    (set! (.-onupgradeneeded request)
-          #(let [db (-> % .-target .-result)
-                 os (.createObjectStore db idb-key)]
-             (reset! s/idb db)
-             (set! (-> os .-transaction .-oncomplete)
-                   (fn [e]
-                      (let [init-os
-                            (-> db
-                                (.transaction idb-key "readwrite")
-                                (.objectStore idb-key))]
-                        (reset! open? true))))))))
+  (if-not (exists? js/indexedDB)
+    ;; Node.js: no IndexedDB — just mark as open with a no-op store
+    (reset! open? true)
+    ;; Browser: use IndexedDB
+    (let [request (.open js/indexedDB idb-key 1)]
+      (set! (.-onerror request) #(do (println :idb-open-error %)))
+      (set! (.-onsuccess request)
+            #(do (reset! s/idb (-> % .-target .-result))
+                 (reset! open? true)))
+      (set! (.-onupgradeneeded request)
+            #(let [db (-> % .-target .-result)
+                   os (.createObjectStore db idb-key)]
+               (reset! s/idb db)
+               (set! (-> os .-transaction .-oncomplete)
+                     (fn [e]
+                       (let [init-os
+                             (-> db
+                                 (.transaction idb-key "readwrite")
+                                 (.objectStore idb-key))]
+                         (reset! open? true)))))))))
 
 (when (= :db (:id e/data))
   (swap! open? (constantly false))

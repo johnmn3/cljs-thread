@@ -1,0 +1,9 @@
+{:passed        false
+ :commit-msg    "Add X-RAY storage model invariant checker with video trace"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "contention-scaling-mixed"
+ :commit        "bce9e7f"
+ :error         "#error {:message \"Error in remote call\", :data {:results \"{:error \\\"#object[RangeError RangeError: Maximum call stack size exceeded]\\\"}\"}}"
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T03:50:31.956Z"}

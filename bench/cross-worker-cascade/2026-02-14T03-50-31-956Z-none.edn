@@ -1,0 +1,11 @@
+{:passed        true
+ :commit-msg    "Add X-RAY storage model invariant checker with video trace"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "cross-worker-cascade"
+ :result        3
+ :label         "3-worker cascade"
+ :commit        "bce9e7f"
+ :elapsed-ms    353.9748359999994
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T03:50:31.956Z"}

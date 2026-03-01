@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add comprehensive test suite for CPS continuation combinators"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           2000
+ :benchmark     "contention-scaling-read-only"
+ :ms-per-op     0.03163331550000021
+ :label         "read-only contention"
+ :commit        "b867717"
+ :elapsed-ms    63.266631000000416
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-13T22:33:09.107Z"
+ :detail        {:stock-throughput 403752.23098343116, :scaling [{:workers 1, :ms 63.47955499999989, :throughput 31506.206998458063, :ratio 0.07803351803584459} {:workers 2, :ms 45.726103000000876, :throughput 43738.69341106898, :ratio 0.10833053059430375} {:workers 4, :ms 63.266631000000416, :throughput 31612.241214487727, :ratio 0.0782961400299606}]}}

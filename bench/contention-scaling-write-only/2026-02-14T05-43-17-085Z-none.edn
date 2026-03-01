@@ -1,0 +1,9 @@
+{:passed        false
+ :commit-msg    "Add X-RAY documentation and README section"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "contention-scaling-write-only"
+ :commit        "464c450"
+ :error         "#error {:message \"Error in remote call\", :data {:results \"{:error \\\"#object[RangeError RangeError: Invalid atomic access index]\\\"}\"}}"
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T05:43:17.085Z"}

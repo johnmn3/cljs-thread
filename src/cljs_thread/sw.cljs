@@ -38,7 +38,7 @@
       (if-let [res (get @s/responses request-id)]
         (do (swap! s/responses dissoc request-id)
             (swap! s/requests dissoc request-id)
-            (.respondWith e (js/Promise.resolve (response res))))
+            (.respondWith e (js/Promise.resolve (response (pr-str res)))))
         (let [p (js/Promise. (fn [resolve _reject]
                                (swap! s/requests assoc request-id resolve)))]
           (.respondWith e p)))
@@ -47,7 +47,7 @@
                                     {:max-time max-time}
                                    (let [result (get @s/responses request-id)]
                                      (swap! s/responses dissoc request-id)
-                                     (response result)))
+                                     (response (pr-str result))))
                           (.then #(js/Promise.resolve %))
                           (.catch #(do (println :error %)
                                        (println :request-id request-id)
@@ -56,7 +56,7 @@
                                        (println :event (pr-str e))
                                        (println :url (pr-str u))
                                        (println :handle-request (pr-str r))
-                                       (js/Promise.resolve (response (clj->js {:error %}))))))))))
+                                       (js/Promise.resolve (response (pr-str {:error %}))))))))))
 
 (defn handle-respond [e]
   (-> (-> e .-request .clone .text)
@@ -64,9 +64,33 @@
                (let [{:keys [request-id] res :response} (edn/read-string data)]
                  (if-let [resolve (get @s/requests request-id)]
                    (do (swap! s/requests dissoc request-id)
-                       (resolve (response res)))
+                       (resolve (response (pr-str res))))
                    (swap! s/responses assoc request-id res))))))
   (.respondWith e (js/Promise.resolve (response "done"))))
+
+(defn handle-kernel [e]
+  (let [url (js/URL. (.-url e.request))
+        params (.-searchParams url)
+        init-data (.get params "d")
+        scripts-json (.get params "s")
+        origin (.get params "o")
+        code (str (when init-data
+                    (str "globalThis.__cljs_thread_init_data = "
+                         (js/JSON.stringify init-data) ";\n"))
+                  (when scripts-json
+                    (str "globalThis.__cljs_thread_spawn_scripts = "
+                         scripts-json ";\n"))
+                  (when origin
+                    (str "globalThis.__cljs_thread_origin = "
+                         (js/JSON.stringify origin) ";\n"))
+                  (when scripts-json
+                    (str "importScripts.apply(self, " scripts-json ");\n")))]
+    (.respondWith e
+      (js/Promise.resolve
+        (js/Response. code
+                      #js {"headers"
+                           #js {"content-type" "application/javascript"
+                                "Cache-Control" "no-cache, no-store"}})))))
 
 (defn fetch-response [e]
   (let [url (js/URL. (.-url e.request))
@@ -76,7 +100,9 @@
           (= path "/intercept/request/key.js")
           (handle-request e)
           (= path "/intercept/response/key.js")
-          (handle-respond e))))
+          (handle-respond e)
+          (= path "/cljs-thread-kernel.js")
+          (handle-kernel e))))
 
 (when (e/in-sw?)
 

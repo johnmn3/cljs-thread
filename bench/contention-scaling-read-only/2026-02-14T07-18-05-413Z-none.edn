@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Epoch-safe GC: fix concurrent reader data races in swap!/retire paths"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           8000
+ :benchmark     "contention-scaling-read-only"
+ :ms-per-op     0.006893582374999823
+ :label         "read-only contention"
+ :commit        "447e25c"
+ :elapsed-ms    55.14865899999859
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T07:18:05.413Z"
+ :detail        {:stock-throughput 395545.42673593876, :scaling [{:workers 1, :ms 49.47369500000059, :throughput 161702.09239475452, :ratio 0.40880789275995055} {:workers 2, :ms 47.22002400000201, :throughput 169419.65129030132, :ratio 0.42831907497543587} {:workers 4, :ms 41.75737800000206, :throughput 191582.91021049273, :ratio 0.4843512205195868} {:workers 8, :ms 48.951130000001285, :throughput 163428.30083799476, :ratio 0.4131720146194421} {:workers 16, :ms 55.14865899999859, :throughput 145062.45745703817, :ratio 0.366740322733854}]}}
