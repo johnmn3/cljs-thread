@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Eve Test Runner</title>
+  <style>
+    body { font-family: monospace; margin: 2em; background: #1a1a2e; color: #e0e0e0; }
+    h1 { color: #c9d1d9; margin-bottom: 0.5em; }
+    #status { font-size: 1.4em; padding: 0.5em; margin: 1em 0; border-radius: 4px; }
+    #status.running { background: #1f3a5f; color: #58a6ff; }
+    #status.pass { background: #0d3b1e; color: #3fb950; }
+    #status.fail { background: #3b1014; color: #f85149; }
+    #results { white-space: pre-wrap; padding: 1em; background: #0d1117; border-radius: 4px; }
+    #log { margin-top: 1em; font-size: 0.85em; color: #8b949e; max-height: 60vh; overflow-y: auto; }
+  </style>
+</head>
+<body>
+  <h1>Eve Test Runner</h1>
+  <div id="status" class="running">Initializing...</div>
+  <div id="results"></div>
+  <pre id="log"></pre>
+  <script>
+    // Capture console.log output into the #log element
+    const origLog = console.log;
+    const logEl = document.getElementById('log');
+    console.log = function() {
+      origLog.apply(console, arguments);
+      const line = Array.from(arguments).join(' ');
+      logEl.textContent += line + '\n';
+      logEl.scrollTop = logEl.scrollHeight;
+    };
+  </script>
+  <script src="main.js"></script>
+</body>
+</html>

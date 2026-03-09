@@ -1,0 +1,14 @@
+{:cljdoc.doc/tree
+ [["Getting Started"        {:file "doc/01-getting-started.md"}]
+  ["API Guide"              {:file "doc/02-api-guide.md"}
+   ["Binding Conveyance"    {:file "doc/03-binding-conveyance.md"}]
+   ["Yield & Async"         {:file "doc/04-yield-and-async.md"}]]
+  ["Build Configuration"    {:file "doc/05-build-configuration.md"}]
+  ["Deployment"             {:file "doc/06-deployment.md"}]
+  ["Architecture"           {:file "doc/07-architecture.md"}]
+  ["Eve Data Structures"    {:file "doc/08-eve-data-structures.md"}]
+  ["Stepping Debugger"      {:file "doc/09-stepping-debugger.md"}]
+  ["Testing"                {:file "doc/10-testing.md"}]
+  ["Agent & Contributor Guide" {:file "doc/11-agent-guide.md"}]
+  ["Platform Support"       {:file "doc/12-platform-support.md"}]
+  ["History & Design Notes" {:file "doc/13-history.md"}]]}

@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Port contention scaling benchmarks from parent repo to cljs-thread bench framework"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           20
+ :benchmark     "rapid-sequential-swaps"
+ :ms-per-op     1.8140129999999772
+ :result        20
+ :label         "sequential swaps"
+ :commit        "ac9a83e"
+ :elapsed-ms    36.280259999999544
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-13T22:57:59.898Z"}

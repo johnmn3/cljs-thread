@@ -1,0 +1,9 @@
+{:passed        false
+ :commit-msg    "Add bench test files and intermediate bench results"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "contention-scaling-rcw"
+ :commit        "f307f96"
+ :error         "#object[Error Error: Map allocation failed: out of memory for 64 bytes]"
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T02:11:27.592Z"}

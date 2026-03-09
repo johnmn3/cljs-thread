@@ -1,0 +1,11 @@
+{:passed        true
+ :commit-msg    "Add bench test files and intermediate bench results"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "nested-spawn-swaps"
+ :label         "nested-spawn"
+ :commit        "f307f96"
+ :elapsed-ms    683.1344540000009
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T03:02:49.998Z"
+ :detail        {:counter 4, :expected 4}}

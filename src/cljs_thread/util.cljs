@@ -23,12 +23,27 @@
       (str (random-uuid))))
 
 (defn num-cores []
-  (.-hardwareConcurrency js/self.navigator))
+  (cond
+    (and (exists? js/self) (exists? js/self.navigator))
+    (.-hardwareConcurrency js/self.navigator)
+
+    (and (exists? js/process) (exists? js/process.versions))
+    (let [os (js* "require('os')")]
+      ;; Use aget to prevent Closure Compiler from renaming .cpus
+      (.-length ((aget os "cpus"))))
+
+    :else 4))
+
+;; Cache UA string at load time, before DOM proxy installs (which would block on Atomics.wait)
+(defonce ^:private cached-user-agent
+  (if (and (exists? js/navigator) (some? js/navigator))
+    (.-userAgent js/navigator)
+    nil))
 
 (defn in-browser? [browser-string]
-  (-> js/navigator.userAgent
-      (.indexOf browser-string)
-      (> -1)))
+  (if cached-user-agent
+    (> (.indexOf cached-user-agent browser-string) -1)
+    false))
 
 (defn in-chrome? []
   (in-browser? "Chrome"))
@@ -86,3 +101,14 @@
   ;;:VideoFrame
   ;;:OffscreenCanvas
   ;;:RTCDataChannel
+
+;; Boot sequence logging - writes to stderr for debugging initialization order
+(defn boot-log
+  "Log boot sequence events to stderr. Thread identifies the worker context."
+  [thread msg]
+  (when (and (exists? js/process) (exists? js/process.versions))
+    (let [ts (- (.now js/Date) (or js/globalThis.__boot_start_time 0))
+          fs (js/require "fs")]
+      (when-not js/globalThis.__boot_start_time
+        (set! js/globalThis.__boot_start_time (.now js/Date)))
+      (.writeSync fs 2 (str "[BOOT +" ts "ms " thread "] " msg "\n")))))

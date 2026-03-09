@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add X-RAY documentation and README section"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           8000
+ :benchmark     "contention-scaling-read-only"
+ :ms-per-op     0.006559954625000045
+ :label         "read-only contention"
+ :commit        "464c450"
+ :elapsed-ms    52.479637000000366
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T04:11:52.525Z"
+ :detail        {:stock-throughput 1029307.8689428355, :scaling [{:workers 1, :ms 38.6160979999986, :throughput 207167.48750741957, :ratio 0.20126872994781797} {:workers 2, :ms 47.04152099999919, :throughput 170062.52837785872, :ratio 0.1652202742339119} {:workers 4, :ms 55.99953500000265, :throughput 142858.32909147587, :ratio 0.1387906703153843} {:workers 8, :ms 48.51667599999928, :throughput 164891.7580421239, :ratio 0.1601967331809852} {:workers 16, :ms 52.479637000000366, :throughput 152440.0788061843, :ratio 0.14809959527730993}]}}

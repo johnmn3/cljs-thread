@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add X-RAY documentation and README section"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           15
+ :benchmark     "multi-key-contention"
+ :ms-per-op     6.38316619999993
+ :label         "multi-key contention"
+ :commit        "464c450"
+ :elapsed-ms    95.74749299999894
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T05:09:12.052Z"
+ :detail        {:total 15, :expected 15, :keys-present 3}}

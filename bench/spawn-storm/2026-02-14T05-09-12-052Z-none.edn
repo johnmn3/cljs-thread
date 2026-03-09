@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add X-RAY documentation and README section"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           10
+ :benchmark     "spawn-storm"
+ :ms-per-op     36.47726679999996
+ :label         "spawn-storm"
+ :commit        "464c450"
+ :elapsed-ms    364.7726679999996
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T05:09:12.052Z"
+ :detail        {:counter 10, :expected 12}}

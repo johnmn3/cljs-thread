@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Port contention scaling benchmarks from parent repo to cljs-thread bench framework"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           5
+ :benchmark     "nested-atom-swap-chain"
+ :ms-per-op     4.028869600000144
+ :result        5
+ :label         "chained read-swap-push"
+ :commit        "ac9a83e"
+ :elapsed-ms    20.14434800000072
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-13T22:57:59.898Z"}

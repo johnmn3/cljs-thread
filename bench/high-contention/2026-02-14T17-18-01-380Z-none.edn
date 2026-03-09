@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Fix 3 concurrency bugs: per-SAB epoch slots, deref epoch protection, post-order retire walk"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           9
+ :benchmark     "high-contention"
+ :ms-per-op     21.381610888888947
+ :label         "contention"
+ :commit        "dbd3293"
+ :elapsed-ms    192.43449800000053
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T17:18:01.380Z"
+ :detail        {:counter 9, :expected 9}}

@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add X-RAY documentation and README section"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           5
+ :benchmark     "round-trip-latency"
+ :ms-per-op     28.303991400000086
+ :result        4
+ :label         "5 sync round-trips"
+ :commit        "464c450"
+ :elapsed-ms    141.51995700000043
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T06:18:35.103Z"}

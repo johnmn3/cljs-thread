@@ -1,0 +1,9 @@
+{:passed        false
+ :commit-msg    "Add X-RAY storage model invariant checker with video trace"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "multi-key-contention"
+ :commit        "bce9e7f"
+ :error         "#object[TypeError TypeError: cljs_thread.future.future is not a function]"
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T03:47:30.294Z"}

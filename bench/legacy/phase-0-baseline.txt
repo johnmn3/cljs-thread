@@ -1,0 +1,26 @@
+Phase 0: Pre-SIMD Baseline
+Date: 2026-02-07
+Config: All WASM enabled (node builders + primitives), update-views! sync re-init
+
+=== SabMap ===
+  build n=10                             1.01ms mean,    985.6 ops/s
+  build n=100                           23.34ms mean,     42.8 ops/s
+  get n=10                                648ns mean,    1.54M ops/s
+  get n=100                               906ns mean,    1.10M ops/s
+  assoc n=10                            63.80us mean,    15.7K ops/s
+  assoc n=100                          122.63us mean,     8.2K ops/s
+  reduce-kv sum n=10                    21.35us mean,    46.8K ops/s
+  reduce-kv sum n=100                  206.04us mean,     4.9K ops/s
+
+=== Atom Operations ===
+  swap! (update :counter inc)           77.15us mean,    13.0K ops/s
+  swap! (assoc :x random)               72.17us mean,    13.9K ops/s
+  swap! (assoc :x same-val)             10.69us mean,    93.6K ops/s
+  reset! (20-key map)                    2.93ms mean,    341.4 ops/s
+
+=== Allocation ===
+  batch-alloc 8×64B                     63.17us mean,    15.8K ops/s
+  alloc-heavy build n=50                 8.56ms mean,    116.9 ops/s
+
+=== GC Sweep ===
+  sweep (after 50 swaps)                 1.68ms mean,    593.7 ops/s

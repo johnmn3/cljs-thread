@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add X-RAY documentation and README section"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           5
+ :benchmark     "nested-atom-swap-chain"
+ :ms-per-op     5.519032199999856
+ :result        5
+ :label         "chained read-swap-push"
+ :commit        "464c450"
+ :elapsed-ms    27.59516099999928
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T05:24:35.857Z"}

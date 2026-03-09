@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add bench results from 2026-02-14 test runs"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           5
+ :benchmark     "round-trip-latency"
+ :ms-per-op     44.95597119999984
+ :result        4
+ :label         "5 sync round-trips"
+ :commit        "afc32be"
+ :elapsed-ms    224.7798559999992
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T16:18:23.296Z"}

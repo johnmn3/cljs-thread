@@ -1,0 +1,9 @@
+{:passed        false
+ :commit-msg    "Add comprehensive test suite for CPS continuation combinators"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "map-growth-stress"
+ :commit        "b867717"
+ :error         "#error {:message \"Error in remote call\", :data {:results \"{:error \\\"#object[ReferenceError ReferenceError: keys_per is not defined]\\\"}\"}}"
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-13T22:33:09.107Z"}

@@ -1,0 +1,11 @@
+{:passed        true
+ :commit-msg    "Add bench test files and intermediate bench results"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "worker-relay-swaps"
+ :result        3
+ :label         "3-hop relay"
+ :commit        "f307f96"
+ :elapsed-ms    380.9897009999986
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T02:48:12.824Z"}

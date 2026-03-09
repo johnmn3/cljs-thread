@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Epoch-safe GC: fix concurrent reader data races in swap!/retire paths"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           12
+ :benchmark     "spawn-storm"
+ :ms-per-op     34.798254083333326
+ :label         "spawn-storm"
+ :commit        "447e25c"
+ :elapsed-ms    417.57904899999994
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T07:01:13.192Z"
+ :detail        {:counter 12, :expected 12}}

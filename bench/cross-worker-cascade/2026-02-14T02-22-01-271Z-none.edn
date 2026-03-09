@@ -1,0 +1,9 @@
+{:passed        false
+ :commit-msg    "Add bench test files and intermediate bench results"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "cross-worker-cascade"
+ :commit        "f307f96"
+ :error         "#error {:message \"Error in remote call\", :data {:results \"{:error \\\"#error {:message \\\\\\\"Error in remote call\\\\\\\", :data {:result \\\\\\\"{:error \\\\\\\\\\\\\\\"#object[Error Error: Vec allocation failed: :out-of-memory]\\\\\\\\\\\\\\\"}\\\\\\\"}}\\\"}\"}}"
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T02:22:01.271Z"}

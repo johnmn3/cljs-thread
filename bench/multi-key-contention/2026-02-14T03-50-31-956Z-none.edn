@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add X-RAY storage model invariant checker with video trace"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           15
+ :benchmark     "multi-key-contention"
+ :ms-per-op     7.35688740000005
+ :label         "multi-key contention"
+ :commit        "bce9e7f"
+ :elapsed-ms    110.35331100000076
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T03:50:31.956Z"
+ :detail        {:total 15, :expected 15, :keys-present 3}}

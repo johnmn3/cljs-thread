@@ -1,0 +1,11 @@
+{:passed        true
+ :commit-msg    "Add X-RAY documentation and README section"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "nested-future-swaps"
+ :label         "nested-future"
+ :commit        "464c450"
+ :elapsed-ms    48.45630100000017
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T04:15:52.181Z"
+ :detail        {:counter 4, :expected 4}}

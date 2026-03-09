@@ -1,11 +1,44 @@
-{:deps {org.clojure/clojurescript {:mvn/version "1.11.60"}
-        net.clojars.john/injest {:mvn/version "0.1.0-beta.8"}}
+{:paths ["src" "ex" "ex/reagami_counter/src" "ex/raytracer/src"]
+ :deps {org.clojure/clojure       {:mvn/version "1.12.0"}
+        net.clojars.john/injest   {:mvn/version "0.1.0-beta.8"}}
  :aliases
- {:test
+ {:node-test
+  {:extra-paths ["test" "target/generated-test"]
+   :extra-deps {thheller/shadow-cljs {:mvn/version "3.3.6"}
+                io.github.borkdude/reagami {:git/tag "v0.0.36"
+                                            :git/sha "562cf3d"}}}
+  :thread-test
+  {:extra-paths ["test" "target/generated-test"]
+   :extra-deps {thheller/shadow-cljs {:mvn/version "3.3.6"}}
+   :main-opts ["-m" "eve.test-runner"]}
+  :test
   {:extra-paths ["test"]
-   :extra-deps {org.clojure/test.check {:mvn/version "1.1.0"}
+   :extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
                 io.github.cognitect-labs/test-runner
                 {:git/tag "v0.5.0" :git/sha "48c3c67"}}}
+  :jvm-test
+  {:extra-paths ["test"]
+   :jvm-opts ["--add-opens" "java.base/java.lang=ALL-UNNAMED"
+              "--enable-native-access=ALL-UNNAMED"
+              "-Dio.netty.tryReflectionSetAccessible=true"]
+   :extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
+                io.github.cognitect-labs/test-runner
+                {:git/tag "v0.5.0" :git/sha "48c3c67"}}
+   :main-opts ["-m" "cognitect.test-runner" "-d" "test"]}
   :build {:deps {io.github.seancorfield/build-clj
                  {:git/tag "v0.3.1" :git/sha "996ddfa"}}
-          :ns-default build}}}
+          :ns-default build}
+  :native-build-atom
+  {:extra-paths ["bench"]
+   :jvm-opts ["--add-opens" "java.base/java.lang=ALL-UNNAMED"
+              "--enable-native-access=ALL-UNNAMED"
+              "-Dio.netty.tryReflectionSetAccessible=true"
+              "-Xmx1g"]
+   :main-opts ["-m" "eve.build-atom"]}
+  :native-x-stress-atom
+  {:extra-paths ["bench"]
+   :jvm-opts ["--add-opens" "java.base/java.lang=ALL-UNNAMED"
+              "--enable-native-access=ALL-UNNAMED"
+              "-Dio.netty.tryReflectionSetAccessible=true"
+              "-Xmx1g"]
+   :main-opts ["-m" "eve.stress-atom"]}}}

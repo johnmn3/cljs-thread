@@ -1,0 +1,9 @@
+{:passed        false
+ :commit-msg    "Add bench results from 2026-02-14 test runs"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "contention-scaling-rcw"
+ :commit        "afc32be"
+ :error         "#error {:message \"Error in remote call\", :data {:results \"{:error \\\"#object[Error Error: EmbeddedSharedAtom -deref ID 21, HdrIdx: 84 failed after 10 retries.]\\\"}\"}}"
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T15:19:35.993Z"}

@@ -1,0 +1,11 @@
+{:passed        true
+ :commit-msg    "Fix CLJS shadow-rename IIFE mismatch in future/in/spawn macros"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "nested-future-swaps"
+ :label         "nested-future"
+ :commit        "a94c92e"
+ :elapsed-ms    20.488745000000563
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T00:46:30.013Z"
+ :detail        {:counter 4, :expected 4}}

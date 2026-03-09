@@ -1,0 +1,35 @@
+{:deps true
+ :builds
+ {;; Dev build: single module, :web-worker true so workers load via importScripts
+  :raytracer-dev
+  {:target     :browser
+   :output-dir "../../docs/raytracer/dev"
+   :asset-path "."
+   :modules    {:main {:entries [cljs-thread.dom.app raytracer.main]
+                        :web-worker true}}
+   :compiler-options {:output-feature-set :es2020}
+   :js-options {:resolve {"worker_threads" {:target :browser :global "null"}
+                          "wabt" {:target :browser :global "null"}}}}
+
+  ;; Release build: multi-module for browser
+  :raytracer-browser
+  {:target     :browser
+   :output-dir "../../docs/raytracer"
+   ;; Module structure for cljs-thread with fat-kernel strategy:
+   ;; - :shared      - common runtime code (cljs.core, message passing)
+   ;; - :cljs-thread - worker kernel (cljs-thread.core, raytracer, EVE)
+   ;; - :screen      - DOM proxy app entry
+   ;;
+   ;; :web-worker true on :cljs-thread tells shadow-cljs to prepend
+   ;; importScripts("shared.js") so the dependency chain loads when
+   ;; the fat-kernel bootstrap calls importScripts(kernelUrl).
+   ;; HTML loads all three scripts; main thread uses the importScripts shim.
+   :modules    {:shared      {:entries [cljs-thread.dom.registry]}
+                :cljs-thread {:entries    [cljs-thread.core raytracer.main raytracer.tile-renderer]
+                              :depends-on #{:shared}
+                              :web-worker true}
+                :screen      {:entries    [cljs-thread.dom.app]
+                              :depends-on #{:cljs-thread}}}
+   :compiler-options {:output-feature-set :es2020}
+   :js-options {:resolve {"worker_threads" {:target :browser :global "null"}
+                          "wabt" {:target :browser :global "null"}}}}}}
