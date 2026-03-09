@@ -35,13 +35,13 @@
 (def ^:const ROOT_BYTES d/ROOT_SAB_SIZE)   ;; 6208
 (def ^:const READER_MAP_BYTES 262144)
 
-;; OBJ-1: Time-throttled retire flush — skip the expensive 256-slot scan
+;; Time-throttled retire flush — skip the expensive 256-slot scan
 ;; when the last scan was recent enough. Correctness: we only delay freeing,
 ;; never free too early. Retire queue grows bounded by threshold.
 (def ^:const FLUSH_INTERVAL_MS 50)
 (def ^:const FLUSH_QUEUE_THRESHOLD 64)
 
-;; OBJ-4: CAS retry backoff — jittered exponential backoff on CAS failure.
+;; CAS retry backoff — jittered exponential backoff on CAS failure.
 ;; Reduces thundering herd under contention (8+ writers).
 ;; Zero overhead when CAS succeeds on the first attempt.
 (def ^:const BACKOFF_CAP_MS 8)
@@ -152,7 +152,7 @@
 
 #?(:cljs
    (do
-     ;; OBJ-4: Tiny SAB used by Atomics.wait for sub-ms CAS backoff sleep.
+     ;; Tiny SAB used by Atomics.wait for sub-ms CAS backoff sleep.
      (def ^:private backoff-i32
        (js/Int32Array. (js/SharedArrayBuffer. 4)))
 
@@ -254,7 +254,7 @@
 
      (defn- cljs-try-flush-retires!
        "Flush retired slab offsets whose epoch is safe to reclaim.
-        OBJ-1: Skip the 256-slot scan when the last scan was recent (< FLUSH_INTERVAL_MS)
+        Skip the 256-slot scan when the last scan was recent (< FLUSH_INTERVAL_MS)
         and the queue is small (< FLUSH_QUEUE_THRESHOLD). This eliminates up to 768
         N-API crossings per swap in the common case."
        [root-r retire-q flush-ts]
@@ -576,7 +576,7 @@
 
      (defn- jvm-try-flush-retires!
        "Free retired HAMT trees whose epoch is safe to reclaim.
-        OBJ-1: Skip the 256-slot scan when the last scan was recent enough."
+        Skip the 256-slot scan when the last scan was recent enough."
        [root-r ^java.util.Queue retire-q sio flush-ts]
        (let [now    (System/currentTimeMillis)
              last-t @flush-ts

@@ -693,7 +693,7 @@
      (def ^:private ^:const TAG-FLAT-VEC       (unchecked-byte 0xEF))
 
 
-     ;; --- OBJ-7: Keyword serialization caches ---
+     ;; --- Keyword serialization caches ---
      ;; ConcurrentHashMap caches for keyword↔bytes, mirroring CLJS kw-ser-cache.
      ;; Evicts when size exceeds 4096 to bound memory.
 
