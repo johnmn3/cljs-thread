@@ -20,13 +20,9 @@ cd cljs-thread
 
 # Install native addon (C++ mmap/CAS/futex ops)
 npm install
-npm run build:addon
-
-# Source the build environment
-source scripts/ccweb-setup.sh
 
 # Compile the Node.js worker (needed for cross-process tests)
-shadow-compile bench-worker
+npx shadow-cljs compile bench-worker
 ```
 
 ---

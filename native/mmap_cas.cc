@@ -30,12 +30,16 @@
 //
 // Requirements:
 //   node-addon-api  (header-only, no link dep)
-//   C++20 compiler (GCC 10+ / Clang 10+) for std::atomic_ref
+//   C++14 compiler (GCC 5+ / Clang 3.4+ / Apple Clang 6+)
 //   Linux (futex syscall for wait/notify — Darwin uses ulock, stubbed below)
+//
+// Note: uses __atomic_* GCC/Clang built-ins instead of std::atomic_ref so
+// that the code compiles on Apple Clang 14 (which lacks std::atomic_ref
+// despite accepting -std=c++20).  The generated machine code is identical —
+// std::atomic_ref is just a thin wrapper over the same builtins.
 
 #include <napi.h>
 
-#include <atomic>
 #include <cstdint>
 #include <cstring>
 
@@ -101,16 +105,6 @@ static std::int64_t* ptr64(Napi::Buffer<uint8_t> buf, uint32_t byte_off)
     return reinterpret_cast<std::int64_t*>(buf.Data() + byte_off);
 }
 
-static std::atomic_ref<std::int32_t> aref(Napi::Buffer<uint8_t> buf, uint32_t byte_off)
-{
-    return std::atomic_ref<std::int32_t>(*ptr32(buf, byte_off));
-}
-
-static std::atomic_ref<std::int64_t> aref64(Napi::Buffer<uint8_t> buf, uint32_t byte_off)
-{
-    return std::atomic_ref<std::int64_t>(*ptr64(buf, byte_off));
-}
-
 // ---------------------------------------------------------------------------
 // open(path, sizeBytes) -> Buffer
 // ---------------------------------------------------------------------------
@@ -174,7 +168,7 @@ static Napi::Value Load32(const Napi::CallbackInfo& info)
     auto buf = info[0].As<Napi::Buffer<uint8_t>>();
     auto off = info[1].As<Napi::Number>().Uint32Value();
     return Napi::Number::New(info.Env(),
-        aref(buf, off).load(std::memory_order_acquire));
+        __atomic_load_n(ptr32(buf, off), __ATOMIC_ACQUIRE));
 }
 
 static Napi::Value Store32(const Napi::CallbackInfo& info)
@@ -182,7 +176,7 @@ static Napi::Value Store32(const Napi::CallbackInfo& info)
     auto buf = info[0].As<Napi::Buffer<uint8_t>>();
     auto off = info[1].As<Napi::Number>().Uint32Value();
     auto val = info[2].As<Napi::Number>().Int32Value();
-    aref(buf, off).store(val, std::memory_order_release);
+    __atomic_store_n(ptr32(buf, off), val, __ATOMIC_RELEASE);
     return info.Env().Undefined();
 }
 
@@ -196,8 +190,8 @@ static Napi::Value Cas32(const Napi::CallbackInfo& info)
     // compare_exchange_strong writes the witnessed value back into `expected`
     // on failure; on success `expected` still holds the original value.
     // Either way `expected` is the old value — exactly what the caller needs.
-    aref(buf, off).compare_exchange_strong(expected, desired,
-                                           std::memory_order_seq_cst);
+    __atomic_compare_exchange_n(ptr32(buf, off), &expected, desired,
+                                false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
     return Napi::Number::New(info.Env(), expected);
 }
 
@@ -206,7 +200,7 @@ static Napi::Value Add32(const Napi::CallbackInfo& info)
     auto buf   = info[0].As<Napi::Buffer<uint8_t>>();
     auto off   = info[1].As<Napi::Number>().Uint32Value();
     auto delta = info[2].As<Napi::Number>().Int32Value();
-    auto old   = aref(buf, off).fetch_add(delta, std::memory_order_seq_cst);
+    auto old   = __atomic_fetch_add(ptr32(buf, off), delta, __ATOMIC_SEQ_CST);
     return Napi::Number::New(info.Env(), old);
 }
 
@@ -215,7 +209,7 @@ static Napi::Value Sub32(const Napi::CallbackInfo& info)
     auto buf   = info[0].As<Napi::Buffer<uint8_t>>();
     auto off   = info[1].As<Napi::Number>().Uint32Value();
     auto delta = info[2].As<Napi::Number>().Int32Value();
-    auto old   = aref(buf, off).fetch_sub(delta, std::memory_order_seq_cst);
+    auto old   = __atomic_fetch_sub(ptr32(buf, off), delta, __ATOMIC_SEQ_CST);
     return Napi::Number::New(info.Env(), old);
 }
 
@@ -230,7 +224,7 @@ static Napi::Value Load64(const Napi::CallbackInfo& info)
 {
     auto buf = info[0].As<Napi::Buffer<uint8_t>>();
     auto off = info[1].As<Napi::Number>().Uint32Value();
-    auto val = aref64(buf, off).load(std::memory_order_acquire);
+    auto val = __atomic_load_n(ptr64(buf, off), __ATOMIC_ACQUIRE);
     return Napi::Number::New(info.Env(), static_cast<double>(val));
 }
 
@@ -239,7 +233,7 @@ static Napi::Value Store64(const Napi::CallbackInfo& info)
     auto buf = info[0].As<Napi::Buffer<uint8_t>>();
     auto off = info[1].As<Napi::Number>().Uint32Value();
     auto val = static_cast<std::int64_t>(info[2].As<Napi::Number>().Int64Value());
-    aref64(buf, off).store(val, std::memory_order_release);
+    __atomic_store_n(ptr64(buf, off), val, __ATOMIC_RELEASE);
     return info.Env().Undefined();
 }
 
@@ -249,8 +243,8 @@ static Napi::Value Cas64(const Napi::CallbackInfo& info)
     auto off      = info[1].As<Napi::Number>().Uint32Value();
     auto expected = static_cast<std::int64_t>(info[2].As<Napi::Number>().Int64Value());
     auto desired  = static_cast<std::int64_t>(info[3].As<Napi::Number>().Int64Value());
-    aref64(buf, off).compare_exchange_strong(expected, desired,
-                                              std::memory_order_seq_cst);
+    __atomic_compare_exchange_n(ptr64(buf, off), &expected, desired,
+                                false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
     return Napi::Number::New(info.Env(), static_cast<double>(expected));
 }
 
@@ -259,7 +253,7 @@ static Napi::Value Add64(const Napi::CallbackInfo& info)
     auto buf   = info[0].As<Napi::Buffer<uint8_t>>();
     auto off   = info[1].As<Napi::Number>().Uint32Value();
     auto delta = static_cast<std::int64_t>(info[2].As<Napi::Number>().Int64Value());
-    auto old   = aref64(buf, off).fetch_add(delta, std::memory_order_seq_cst);
+    auto old   = __atomic_fetch_add(ptr64(buf, off), delta, __ATOMIC_SEQ_CST);
     return Napi::Number::New(info.Env(), static_cast<double>(old));
 }
 
@@ -268,7 +262,7 @@ static Napi::Value Sub64(const Napi::CallbackInfo& info)
     auto buf   = info[0].As<Napi::Buffer<uint8_t>>();
     auto off   = info[1].As<Napi::Number>().Uint32Value();
     auto delta = static_cast<std::int64_t>(info[2].As<Napi::Number>().Int64Value());
-    auto old   = aref64(buf, off).fetch_sub(delta, std::memory_order_seq_cst);
+    auto old   = __atomic_fetch_sub(ptr64(buf, off), delta, __ATOMIC_SEQ_CST);
     return Napi::Number::New(info.Env(), static_cast<double>(old));
 }
 
@@ -287,7 +281,7 @@ static Napi::Value Wait32(const Napi::CallbackInfo& info)
     void* addr = ptr32(buf, off);
 
     // Quick check: if the value already differs, return immediately.
-    if (aref(buf, off).load(std::memory_order_acquire) != expected)
+    if (__atomic_load_n(ptr32(buf, off), __ATOMIC_ACQUIRE) != expected)
         return Napi::String::New(env, "not-equal");
 
 #ifdef __linux__
@@ -311,7 +305,7 @@ static Napi::Value Wait32(const Napi::CallbackInfo& info)
                return ts.tv_sec * 1'000'000'000LL + ts.tv_nsec;
            }()) + timeout_ms * 1'000'000LL;
     while (true) {
-        if (aref(buf, off).load(std::memory_order_acquire) != expected)
+        if (__atomic_load_n(ptr32(buf, off), __ATOMIC_ACQUIRE) != expected)
             return Napi::String::New(env, "ok");
         struct timespec now{};
         clock_gettime(CLOCK_MONOTONIC, &now);
