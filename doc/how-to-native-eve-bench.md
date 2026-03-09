@@ -15,8 +15,8 @@ machine.
 
 ```bash
 # Clone and enter the repo
-git clone https://github.com/johnmn3/cljs-thread/tree/eve-native.git
-cd eve
+git clone -b eve-native https://github.com/johnmn3/cljs-thread.git
+cd cljs-thread
 
 # Install native addon (C++ mmap/CAS/futex ops)
 npm install
