@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add comprehensive test suite for CPS continuation combinators"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           5
+ :benchmark     "nested-atom-swap-chain"
+ :ms-per-op     3.034611199999927
+ :result        5
+ :label         "chained read-swap-push"
+ :commit        "b867717"
+ :elapsed-ms    15.173055999999633
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-13T22:19:31.975Z"}

@@ -1,65 +1,79 @@
 (ns cljs-thread.future
-  (:require-macros
-   [cljs-thread.future])
+  (:require-macros [cljs-thread.future])
   (:require
-   [cljs-thread.util :as u]
-   [cljs-thread.env :as e]
+   [cljs-thread.eve :as e]
    [cljs-thread.spawn :refer [spawn]]
-   [cljs-thread.on-when :refer [on-when]]
-   [cljs-thread.in :refer [in]]
    [cljs-thread.state :as s]
-   [cljs-thread.sync :as sync]))
+   [cljs-thread.util :as u]))
 
-(defn take-worker! []
-  (when-let [p (some->> @s/future-pool :available first)]
-    (swap! s/future-pool
-           (fn [{:keys [available in-use]}]
-             {:available (disj available p)
-              :in-use (conj in-use p)}))
-    p))
+;; Top-level eve atom pool - shared across all workers via SAB
+(defonce pool (e/atom ::future-pool {:waiting #{} :busy #{} :tasks []}))
 
-(defn put-back-worker! [p]
-  (swap! s/future-pool
-         (fn [{:keys [available in-use]}]
-           {:available (conj available p)
-            :in-use (disj in-use p)}))
+(defn ^:export take-worker! []
+  (let [claimed (atom nil)]
+    (swap! pool
+      (fn [{:keys [waiting busy tasks]}]
+        (if-let [w (first waiting)]
+          (do (reset! claimed w)
+              {:waiting (disj waiting w) :busy (conj busy w) :tasks tasks})
+          {:waiting waiting :busy busy :tasks tasks})))
+    @claimed))
+
+(defn ^:export put-back-worker! [worker]
+  (swap! pool
+    (fn [{:keys [waiting busy tasks]}]
+      {:waiting (conj waiting worker)
+       :busy (disj busy worker)
+       :tasks tasks}))
   nil)
 
+(defn ^:export queue-task! [task-fn]
+  (swap! pool update :tasks conj task-fn))
+
+(defn ^:export take-task!
+  "Worker claims a task by removing it from queue. Returns task-fn or nil."
+  [worker-id]
+  (let [claimed (atom nil)]
+    (swap! pool
+      (fn [{:keys [waiting busy tasks]}]
+        (if-let [task (first tasks)]
+          (do (reset! claimed task)
+              {:waiting waiting :busy busy :tasks (vec (rest tasks))})
+          {:waiting waiting :busy busy :tasks tasks})))
+    @claimed))
+
 (defn mk-worker-ids [n]
-  (let [ws (-> n (or (inc (u/num-cores))) (/ 2) int)]
+  (let [ws (or n (inc (u/num-cores)))]
     (->> ws range (map #(keyword (str "fp-" %))))))
 
-(defn init-future! [& [{:as config-map :keys [future-ids]}]]
-  (assert (e/in-future?))
-  (when config-map
-    (s/update-conf! config-map)
-    (when future-ids
-      (swap! s/future-pool update :available into future-ids))))
+(defn ^:export init-pool! [worker-ids]
+  (u/boot-log "pool" (str "init-pool! " (vec worker-ids)))
+  (swap! pool assoc :waiting (set worker-ids)))
 
-(defn start-futures [configs]
-  (let [future-ids (mk-worker-ids (:future-count configs))
-        future-conf (assoc configs :future-ids future-ids)]
-    (spawn {:id :future :no-globals? true}
-           (init-future! future-conf))
-    (->> future-ids
-         (mapv (fn [fid]
-                 (spawn {:id fid :no-globals? true}
-                        (s/update-conf! future-conf)))))))
+(defn spawn-future-workers-phase-1
+  "Spawn :future coordinator and the first 2 fp-* workers.
+   Pool should already be initialized via init-pool! before calling this."
+  [worker-ids config]
+  (let [future-conf (assoc config :future-ids worker-ids)
+        phase-1-ids (take 2 worker-ids)]
+    (spawn {:id :future :no-globals? true :screen-spawn true}
+           (s/update-conf! future-conf))
+    (doseq [wid phase-1-ids]
+      (spawn {:id wid :no-globals? true :screen-spawn true}
+             (s/update-conf! future-conf)))))
 
-(defn do-future [args afn opts]
-  (let [fut-id (u/gen-id)]
-    (in :future [args afn fut-id] ;; <- TODO: prevent implicit conveyer param duplication (dissallowed for arraybuffer transfers)
-        (on-when (-> @s/future-pool :available seq) {:duration 5}
-          (let [worker (take-worker!)]
-            (in worker [args afn fut-id worker]
-                (try
-                  (if (seq args)
-                    ((apply afn args)
-                     #(sync/send-response {:request-id fut-id :response %}))
-                    ((afn)
-                     #(sync/send-response {:request-id fut-id :response %})))
-                  (catch :default e
-                    (sync/send-response {:request-id fut-id :response {:error (pr-str e)}})))
-                (in :future
-                    (put-back-worker! worker))))))
-    (sync/wrap-derefable (merge opts {:id fut-id}))))
+(defn spawn-future-workers-phase-2
+  "Spawn remaining fp-* workers (all except the first 2)."
+  [worker-ids config]
+  (let [future-conf (assoc config :future-ids worker-ids)
+        phase-2-ids (drop 2 worker-ids)]
+    (doseq [wid phase-2-ids]
+      (spawn {:id wid :no-globals? true :screen-spawn true}
+             (s/update-conf! future-conf)))))
+
+(defn start-futures
+  "No-op - pool and workers now initialized from screen thread.
+   Kept for backwards compatibility."
+  [configs]
+  (u/boot-log "root" "start-futures (no-op, pool initialized from screen)")
+  (:future-ids configs))

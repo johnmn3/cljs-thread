@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add bench results from 2026-02-14 test runs"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           12
+ :benchmark     "cas-retry-pressure"
+ :ms-per-op     14.239939333333345
+ :label         "CAS pressure"
+ :commit        "afc32be"
+ :elapsed-ms    170.87927200000013
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T16:01:48.055Z"
+ :detail        {:counter 12, :expected 12}}

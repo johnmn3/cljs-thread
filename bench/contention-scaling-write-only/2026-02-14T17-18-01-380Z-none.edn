@@ -1,0 +1,9 @@
+{:passed        false
+ :commit-msg    "Fix 3 concurrency bugs: per-SAB epoch slots, deref epoch protection, post-order retire walk"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "contention-scaling-write-only"
+ :commit        "dbd3293"
+ :error         "#error {:message \"Error in remote call\", :data {:results \"{:error \\\"#object[Error Error: Map allocation failed: out of memory for 256 bytes]\\\"}\"}}"
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T17:18:01.380Z"}

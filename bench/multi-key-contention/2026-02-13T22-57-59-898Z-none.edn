@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Port contention scaling benchmarks from parent repo to cljs-thread bench framework"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           15
+ :benchmark     "multi-key-contention"
+ :ms-per-op     3.8491429333333143
+ :label         "multi-key contention"
+ :commit        "ac9a83e"
+ :elapsed-ms    57.73714399999972
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-13T22:57:59.898Z"
+ :detail        {:total 15, :expected 15, :keys-present 3}}

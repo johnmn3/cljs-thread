@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add comprehensive test suite for CPS continuation combinators"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           12
+ :benchmark     "spawn-storm"
+ :ms-per-op     33.987422416666654
+ :label         "spawn-storm"
+ :commit        "b867717"
+ :elapsed-ms    407.8490689999999
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-13T22:34:22.896Z"
+ :detail        {:counter 12, :expected 12}}

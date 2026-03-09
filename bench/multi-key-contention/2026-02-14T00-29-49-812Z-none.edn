@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Fix CLJS shadow-rename IIFE mismatch in future/in/spawn macros"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           15
+ :benchmark     "multi-key-contention"
+ :ms-per-op     4.351414866666649
+ :label         "multi-key contention"
+ :commit        "a94c92e"
+ :elapsed-ms    65.27122299999974
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T00:29:49.812Z"
+ :detail        {:total 15, :expected 15, :keys-present 3}}

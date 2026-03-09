@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add comprehensive test suite for CPS continuation combinators"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           5
+ :benchmark     "round-trip-latency"
+ :ms-per-op     5.708634399999937
+ :result        4
+ :label         "5 sync round-trips"
+ :commit        "b867717"
+ :elapsed-ms    28.543171999999686
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-13T22:37:29.446Z"}

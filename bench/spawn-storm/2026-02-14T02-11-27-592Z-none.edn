@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add bench test files and intermediate bench results"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           12
+ :benchmark     "spawn-storm"
+ :ms-per-op     32.49206891666669
+ :label         "spawn-storm"
+ :commit        "f307f96"
+ :elapsed-ms    389.9048270000003
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T02:11:27.592Z"
+ :detail        {:counter 12, :expected 12}}

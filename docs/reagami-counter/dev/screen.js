@@ -1,0 +1,2 @@
+SHADOW_ENV.evalLoad("cljs_thread.dom.app.js", true, "goog.provide(\x27cljs_thread.dom.app\x27);\n");
+SHADOW_ENV.evalLoad("shadow.module.screen.append.js", false, ";\nSHADOW_ENV.setLoaded(\x22cljs_thread.dom.app.js\x22);\nSHADOW_ENV.setLoaded(\x22shadow.module.screen.append.js\x22);");

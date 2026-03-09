@@ -1,0 +1,9 @@
+{:passed        false
+ :commit-msg    "Add X-RAY documentation and README section"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "contention-scaling-read-only"
+ :commit        "464c450"
+ :error         "#object[RangeError RangeError: Offset is outside the bounds of the DataView]"
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T05:43:17.085Z"}

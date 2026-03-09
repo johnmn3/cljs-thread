@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Fix CLJS shadow-rename IIFE mismatch in future/in/spawn macros"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           20
+ :benchmark     "rapid-sequential-swaps"
+ :ms-per-op     1.6581363499999953
+ :result        20
+ :label         "sequential swaps"
+ :commit        "a94c92e"
+ :elapsed-ms    33.162726999999904
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-13T23:28:30.825Z"}

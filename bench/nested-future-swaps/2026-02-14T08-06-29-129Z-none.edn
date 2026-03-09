@@ -1,0 +1,11 @@
+{:passed        true
+ :commit-msg    "Epoch-safe GC: fix concurrent reader data races in swap!/retire paths"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "nested-future-swaps"
+ :label         "nested-future"
+ :commit        "447e25c"
+ :elapsed-ms    63.0872760000002
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T08:06:29.129Z"
+ :detail        {:counter 4, :expected 4}}

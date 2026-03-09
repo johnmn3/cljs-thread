@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Fix 3 concurrency bugs: per-SAB epoch slots, deref epoch protection, post-order retire walk"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           8000
+ :benchmark     "contention-scaling-read-only"
+ :ms-per-op     0.006209525125001164
+ :label         "read-only contention"
+ :commit        "dbd3293"
+ :elapsed-ms    49.676201000009314
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T16:55:51.629Z"
+ :detail        {:stock-throughput 669234.1276282113, :scaling [{:workers 1, :ms 49.2860639999999, :throughput 162317.68882984886, :ratio 0.2425424558145418} {:workers 2, :ms 48.62956899999699, :throughput 164508.96367188645, :ratio 0.2458167581126083} {:workers 4, :ms 46.72901799999818, :throughput 171199.83133393285, :ratio 0.25581455617135207} {:workers 8, :ms 52.12638900001184, :throughput 153473.128552952, :ratio 0.22932651252688807} {:workers 16, :ms 49.676201000009314, :throughput 161042.91066860166, :ratio 0.24063762444294834}]}}

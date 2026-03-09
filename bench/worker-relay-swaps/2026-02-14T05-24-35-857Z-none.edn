@@ -1,0 +1,11 @@
+{:passed        true
+ :commit-msg    "Add X-RAY documentation and README section"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "worker-relay-swaps"
+ :result        3
+ :label         "3-hop relay"
+ :commit        "464c450"
+ :elapsed-ms    376.9890660000001
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T05:24:35.857Z"}

@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Fix CLJS shadow-rename IIFE mismatch in future/in/spawn macros"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           10
+ :benchmark     "cas-retry-pressure"
+ :ms-per-op     5.175655600000027
+ :label         "CAS pressure"
+ :commit        "a94c92e"
+ :elapsed-ms    51.75655600000027
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T00:04:56.153Z"
+ :detail        {:counter 10, :expected 12}}

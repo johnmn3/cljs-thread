@@ -1,0 +1,9 @@
+{:passed        false
+ :commit-msg    "Add bench test files and intermediate bench results"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "round-trip-latency"
+ :commit        "f307f96"
+ :error         "#object[Error Error: do-private-atom-swap! failed after max retries.]"
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T02:29:26.724Z"}

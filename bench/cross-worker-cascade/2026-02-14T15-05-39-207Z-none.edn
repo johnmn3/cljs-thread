@@ -1,0 +1,11 @@
+{:passed        true
+ :commit-msg    "Add bench results from 2026-02-14 test runs"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "cross-worker-cascade"
+ :result        3
+ :label         "3-worker cascade"
+ :commit        "afc32be"
+ :elapsed-ms    459.916623000001
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T15:05:39.207Z"}

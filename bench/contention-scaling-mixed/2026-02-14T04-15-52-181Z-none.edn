@@ -1,0 +1,9 @@
+{:passed        false
+ :commit-msg    "Add X-RAY documentation and README section"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "contention-scaling-mixed"
+ :commit        "464c450"
+ :error         "#error {:message \"Error in remote call\", :data {:results \"{:error \\\"#object[RangeError RangeError: Maximum call stack size exceeded]\\\"}\"}}"
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T04:15:52.181Z"}

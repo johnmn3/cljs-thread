@@ -1,0 +1,11 @@
+{:passed        true
+ :commit-msg    "Add comprehensive test suite for CPS continuation combinators"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "nested-spawn-swaps"
+ :label         "nested-spawn"
+ :commit        "b867717"
+ :elapsed-ms    773.6958850000001
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-13T22:33:09.107Z"
+ :detail        {:counter 4, :expected 4}}

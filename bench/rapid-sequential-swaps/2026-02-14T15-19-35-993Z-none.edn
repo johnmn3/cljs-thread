@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add bench results from 2026-02-14 test runs"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           20
+ :benchmark     "rapid-sequential-swaps"
+ :ms-per-op     34.32173560000001
+ :result        20
+ :label         "sequential swaps"
+ :commit        "afc32be"
+ :elapsed-ms    686.4347120000002
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T15:19:35.993Z"}

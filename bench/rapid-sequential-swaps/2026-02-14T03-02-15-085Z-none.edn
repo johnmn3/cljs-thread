@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add bench test files and intermediate bench results"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           20
+ :benchmark     "rapid-sequential-swaps"
+ :ms-per-op     7.498751950000042
+ :result        20
+ :label         "sequential swaps"
+ :commit        "f307f96"
+ :elapsed-ms    149.97503900000083
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T03:02:15.085Z"}

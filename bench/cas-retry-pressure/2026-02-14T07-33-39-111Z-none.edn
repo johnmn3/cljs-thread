@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Epoch-safe GC: fix concurrent reader data races in swap!/retire paths"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           12
+ :benchmark     "cas-retry-pressure"
+ :ms-per-op     10.190897916666776
+ :label         "CAS pressure"
+ :commit        "447e25c"
+ :elapsed-ms    122.2907750000013
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T07:33:39.111Z"
+ :detail        {:counter 12, :expected 12}}

@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add X-RAY storage model invariant checker with video trace"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           12
+ :benchmark     "spawn-storm"
+ :ms-per-op     31.498303999999887
+ :label         "spawn-storm"
+ :commit        "bce9e7f"
+ :elapsed-ms    377.97964799999863
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T03:50:31.956Z"
+ :detail        {:counter 12, :expected 12}}

@@ -1,0 +1,9 @@
+{:passed        false
+ :commit-msg    "Epoch-safe GC: fix concurrent reader data races in swap!/retire paths"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "contention-scaling-rcw"
+ :commit        "447e25c"
+ :error         "#error {:message \"Error in remote call\", :data {:results \"{:error \\\"#object[RangeError RangeError: Maximum call stack size exceeded]\\\"}\"}}"
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T07:18:05.413Z"}

@@ -1,0 +1,11 @@
+{:passed        true
+ :commit-msg    "Add X-RAY storage model invariant checker with video trace"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "nested-spawn-swaps"
+ :label         "nested-spawn"
+ :commit        "bce9e7f"
+ :elapsed-ms    744.3250230000012
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T03:50:31.956Z"
+ :detail        {:counter 4, :expected 4}}

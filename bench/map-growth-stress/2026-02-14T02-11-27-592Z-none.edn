@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add bench test files and intermediate bench results"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           15
+ :benchmark     "map-growth-stress"
+ :ms-per-op     3.500103333333391
+ :label         "map-growth"
+ :commit        "f307f96"
+ :elapsed-ms    52.50155000000086
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T02:11:27.592Z"
+ :detail        {:key-count 15, :expected-keys 15}}

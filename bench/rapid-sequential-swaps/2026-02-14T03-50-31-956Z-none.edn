@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add X-RAY storage model invariant checker with video trace"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           20
+ :benchmark     "rapid-sequential-swaps"
+ :ms-per-op     7.009610900000007
+ :result        20
+ :label         "sequential swaps"
+ :commit        "bce9e7f"
+ :elapsed-ms    140.19221800000014
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T03:50:31.956Z"}

@@ -1,0 +1,9 @@
+{:passed        false
+ :commit-msg    "Fix CLJS shadow-rename IIFE mismatch in future/in/spawn macros"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "nested-future-swaps"
+ :commit        "a94c92e"
+ :error         "#object[TypeError TypeError: cljs_thread.future.future is not a function]"
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-13T23:31:37.539Z"}

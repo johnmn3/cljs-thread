@@ -1,0 +1,9 @@
+{:passed        false
+ :commit-msg    "Fix CLJS shadow-rename IIFE mismatch in future/in/spawn macros"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "contention-scaling-mixed"
+ :commit        "a94c92e"
+ :error         "#object[Error Error: Map allocation failed: out of memory for 128 bytes]"
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-13T23:28:30.825Z"}

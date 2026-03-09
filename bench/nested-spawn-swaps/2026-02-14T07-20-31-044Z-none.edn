@@ -1,0 +1,9 @@
+{:passed        false
+ :commit-msg    "Epoch-safe GC: fix concurrent reader data races in swap!/retire paths"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :benchmark     "nested-spawn-swaps"
+ :commit        "447e25c"
+ :error         "#error {:message \"Error in remote call\", :data {:results \"{:error \\\"#error {:message \\\\\\\"Error in remote call\\\\\\\", :data {:result \\\\\\\"{:error \\\\\\\\\\\\\\\"#object[Error Error: Map allocation failed: out of memory for 64 bytes]\\\\\\\\\\\\\\\"}\\\\\\\"}}\\\"}\"}}"
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T07:20:31.044Z"}

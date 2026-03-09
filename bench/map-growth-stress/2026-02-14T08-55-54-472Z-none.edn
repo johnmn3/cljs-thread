@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Epoch-safe GC: fix concurrent reader data races in swap!/retire paths"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           15
+ :benchmark     "map-growth-stress"
+ :ms-per-op     16.125366200000038
+ :label         "map-growth"
+ :commit        "447e25c"
+ :elapsed-ms    241.88049300000057
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-14T08:55:54.472Z"
+ :detail        {:key-count 15, :expected-keys 15}}

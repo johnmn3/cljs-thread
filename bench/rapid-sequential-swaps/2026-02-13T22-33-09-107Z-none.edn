@@ -1,0 +1,13 @@
+{:passed        true
+ :commit-msg    "Add comprehensive test suite for CPS continuation combinators"
+ :node-version  "v22.22.0"
+ :optimizations "none"
+ :ops           20
+ :benchmark     "rapid-sequential-swaps"
+ :ms-per-op     1.9883525499999906
+ :result        20
+ :label         "sequential swaps"
+ :commit        "b867717"
+ :elapsed-ms    39.76705099999981
+ :branch        "claude/sharedarraybuffer-structures-Uwgnw"
+ :timestamp     "2026-02-13T22:33:09.107Z"}
