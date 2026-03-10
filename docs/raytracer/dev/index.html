@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EVE Ray Tracer — Dev Mode</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>EVE Ray Tracer</h1>
+      <p class="subtitle">Parallel ray tracing with shared-memory workers (DEV)</p>
+    </header>
+
+    <main>
+      <div class="canvas-wrap">
+        <canvas id="render-canvas" width="800" height="450"></canvas>
+      </div>
+
+      <div class="controls">
+        <div class="control-group">
+          <label for="resolution">Resolution</label>
+          <select id="resolution">
+            <option value="400x225">400 &times; 225</option>
+            <option value="800x450" selected>800 &times; 450</option>
+            <option value="1200x675">1200 &times; 675</option>
+            <option value="1600x900">1600 &times; 900</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="spp">Samples / pixel</label>
+          <select id="spp">
+            <option value="1">1</option>
+            <option value="4">4</option>
+            <option value="10" selected>10</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="workers">Workers</label>
+          <select id="workers">
+            <!-- populated by JS based on hardwareConcurrency -->
+            <option value="4">4</option>
+          </select>
+        </div>
+
+        <button id="render-btn" class="render-btn">Render</button>
+      </div>
+
+      <div class="progress">
+        <div class="progress-track">
+          <div id="progress-bar" class="progress-bar"></div>
+        </div>
+        <p id="progress-text" class="progress-text">Loading...</p>
+      </div>
+
+      <section class="info">
+        <h2>How it works</h2>
+        <p>
+          This demo renders a ray-traced scene using <strong>Web Workers</strong>
+          that share memory through <strong>SharedArrayBuffer</strong>, powered by
+          <a href="https://github.com/johnmn3/cljs-thread">cljs-thread</a>
+          and the <a href="https://github.com/SeniorCareMarket-com/eve">EVE</a>
+          AtomDomain.
+        </p>
+
+        <h3>The Core Parallelism</h3>
+        <p>The entire render loop is just a parallel map over tile indices:</p>
+        <pre><code class="language-clojure">;; Render all tiles in parallel across workers
+(pmap (fn [tile-idx]
+        (render-tile! app-state tile-idx
+                      tile-w tile-h img-w img-h spp))
+      tile-indices)</code></pre>
+
+        <p>
+          Each worker reads scene data from a shared <code>eve/atom</code> and writes
+          directly to a shared framebuffer backed by <code>SharedArrayBuffer</code>.
+          The screen thread continuously draws the framebuffer while rendering proceeds:
+        </p>
+        <pre><code class="language-clojure">;; Screen thread draw loop (runs at 60fps)
+(in :screen
+  (let [buf (arr/get-typed-view framebuffer)
+        img-data (.createImageData ctx img-w img-h)]
+    (.set (.-data img-data) buf)
+    (.putImageData ctx img-data 0 0)))</code></pre>
+      </section>
+    </main>
+
+    <footer>
+      <a href="https://github.com/SeniorCareMarket-com/eve">EVE on GitHub</a>
+    </footer>
+  </div>
+
+  <!-- Dev build: single module -->
+  <script src="main.js"></script>
+  <script>cljs_thread.main(raytracer.main.main)</script>
+  <!-- COI Service Worker for SharedArrayBuffer on GitHub Pages -->
+  <script src="../coi-serviceworker.js"></script>
+</body>
+</html>

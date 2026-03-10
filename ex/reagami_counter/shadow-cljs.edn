@@ -1,0 +1,28 @@
+{:deps true
+ :builds
+ {:reagami-counter-dev
+  {:target     :browser
+   :output-dir "../../docs/reagami-counter/dev"
+   :asset-path "."
+   :modules    {:cljs-thread {:entries    [cljs-thread.core reagami-counter.core]
+                               :web-worker true}
+                :screen      {:entries    [cljs-thread.dom.app]
+                               :depends-on #{:cljs-thread}}}
+   :devtools   {:enabled false}
+   :compiler-options {:optimizations :none
+                      :output-feature-set :es2020}
+   :js-options {:resolve {"worker_threads" {:target :browser :global "null"}
+                          "wabt"           {:target :browser :global "null"}}}}
+  :reagami-counter-browser
+  {:target     :browser
+   :output-dir "../../docs/reagami-counter"
+   :asset-path "."
+   :modules    {:shared      {:entries    [cljs-thread.dom.registry]}
+                :cljs-thread {:entries    [cljs-thread.core reagami-counter.core]
+                               :depends-on #{:shared}
+                               :web-worker true}
+                :screen      {:entries    [cljs-thread.dom.app]
+                               :depends-on #{:cljs-thread}}}
+   :compiler-options {:output-feature-set :es2020}
+   :js-options {:resolve {"worker_threads" {:target :browser :global "null"}
+                          "wabt"           {:target :browser :global "null"}}}}}}

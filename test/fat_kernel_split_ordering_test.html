@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<!--
+  Script-ordering robustness test for fat-kernel URL-forward (Strategy 1),
+  split-module build variant (fat-kernel-split-browser).
+
+  Same purpose as fat_kernel_ordering_test.html but for the split build
+  where cljs-thread.js must be loaded before shared.js.
+
+  A decoy script appears BEFORE cljs-thread.js — the probe-based
+  detect-kernel-url-browser! must skip it and find manifest.edn from
+  cljs-thread.js's base URL instead.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>cljs-thread Fat Kernel Split — Ordering Robustness Test</title>
+  <style>
+    body { background: #0d1117; color: #c9d1d9; font-family: monospace; padding: 1em; }
+    #status { font-size: 1.4em; padding: 0.5em; margin: 1em 0; }
+    #status.running { background: #1a1a2e; color: #58a6ff; }
+    #status.pass { background: #0d3b1e; color: #3fb950; }
+    #status.fail { background: #3b1012; color: #f85149; }
+    #log { max-height: 60vh; overflow-y: auto; }
+    pre { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Fat Kernel Split — Script Ordering Robustness Test</h1>
+  <p>A decoy script (404) appears <strong>before</strong> the kernel scripts.
+     Strategy 1 probe-based detection must still find the kernel correctly.</p>
+  <div id="status" class="running">Initializing...</div>
+  <div id="results"></div>
+  <pre id="log"></pre>
+  <!--
+    DECOY: a non-kernel script loaded FIRST.
+    This 404s — the probe-based detect-kernel-url-browser! must skip it
+    and find manifest.edn from cljs-thread.js's base URL instead.
+  -->
+  <script src="/nonexistent-decoy-script.js"></script>
+  <!-- Kernel scripts (same directory, has manifest.edn) -->
+  <script src="cljs-thread.js"></script>
+  <script src="shared.js"></script>
+  <script src="screen.js"></script>
+</body>
+</html>

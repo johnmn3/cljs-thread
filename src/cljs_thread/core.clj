@@ -1,7 +1,14 @@
 (ns cljs-thread.core
   (:refer-clojure :exclude [future pmap pcalls pvalues])
   (:require
-   [injest.path]))
+   [injest.path]
+   ;; Load dependent macro namespaces so trampoline macros expand correctly.
+   ;; Without these, (cljs-thread.in/in ...) etc. are treated as function calls.
+   [cljs-thread.in]
+   [cljs-thread.future]
+   [cljs-thread.spawn]
+   [cljs-thread.injest]
+   [cljs-thread.pmap]))
 
 (defmacro in [& x]
   `(cljs-thread.in/in ~@x))

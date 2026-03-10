@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EVE Ray Tracer — Parallel Rendering with SharedArrayBuffer</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>EVE Ray Tracer</h1>
+      <p class="subtitle">Parallel ray tracing with shared-memory workers</p>
+    </header>
+
+    <main>
+      <div class="canvas-wrap">
+        <canvas id="render-canvas" width="800" height="450"></canvas>
+      </div>
+
+      <div class="controls">
+        <div class="control-group">
+          <label for="resolution">Resolution</label>
+          <select id="resolution">
+            <option value="400x225">400 &times; 225</option>
+            <option value="800x450" selected>800 &times; 450</option>
+            <option value="1200x675">1200 &times; 675</option>
+            <option value="1600x900">1600 &times; 900</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="spp">Samples / pixel</label>
+          <select id="spp">
+            <option value="1">1</option>
+            <option value="4">4</option>
+            <option value="10" selected>10</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="workers">Workers</label>
+          <select id="workers">
+            <!-- populated by JS based on hardwareConcurrency -->
+            <option value="4">4</option>
+          </select>
+        </div>
+
+        <button id="render-btn" class="render-btn">Render</button>
+      </div>
+
+      <div class="progress">
+        <div class="progress-track">
+          <div id="progress-bar" class="progress-bar"></div>
+        </div>
+        <p id="progress-text" class="progress-text">Loading...</p>
+      </div>
+
+      <section class="info">
+        <h2>How it works</h2>
+        <p>
+          This demo renders a ray-traced scene using <strong>Web Workers</strong>
+          that share memory through <strong>SharedArrayBuffer</strong>, powered by
+          <a href="https://github.com/johnmn3/cljs-thread">cljs-thread</a>
+          and the <a href="https://github.com/SeniorCareMarket-com/eve">EVE</a>
+          AtomDomain.
+        </p>
+        <ul>
+          <li>
+            <strong>Scene + framebuffer</strong> are stored in a shared EVE <code>atom</code>
+            backed by SharedArrayBuffer. Workers <code>deref</code> the atom to read scene
+            data and write pixels directly to the shared framebuffer &mdash; zero serialization.
+          </li>
+          <li>
+            <strong>Work distribution</strong> uses <code>pmap</code> to parallelize tile
+            rendering across all available workers. Each tile is rendered independently.
+          </li>
+          <li>
+            <strong>Live preview</strong> &mdash; the screen thread runs a 60fps draw loop,
+            continuously blitting the shared framebuffer to canvas while workers render.
+          </li>
+        </ul>
+
+        <h3>The Core Parallelism</h3>
+        <p>The entire render loop is just a parallel map over tile indices:</p>
+<pre><code>;; Render all tiles in parallel across workers
+(pmap (fn [tile-idx]
+        (render-tile! app-state tile-idx
+                      tile-w tile-h img-w img-h spp))
+      tile-indices)</code></pre>
+
+        <p>Each worker reads scene data from the shared atom and writes directly to the
+        shared framebuffer:</p>
+<pre><code>;; Worker — render one tile directly to shared framebuffer
+(defn render-tile! [app-state tile-idx tile-w tile-h img-w img-h spp]
+  (let [state @app-state
+        {:keys [spheres materials camera-opts]} (unpack-scene state)
+        camera (cam/make-camera camera-opts)
+        framebuffer (arr/get-typed-view (:framebuffer state))]
+    (render-tile-to-framebuffer! tile-idx tile-w tile-h img-w img-h spp
+                                  framebuffer camera spheres materials)
+    tile-idx))</code></pre>
+
+        <p>The screen thread continuously draws the framebuffer while rendering proceeds:</p>
+<pre><code>;; Screen thread draw loop (runs at 60fps)
+(in :screen
+  (letfn [(draw-loop []
+            (when (:rendering? @app-state)
+              (let [buf (arr/get-typed-view (:framebuffer @app-state))
+                    img-data (.createImageData ctx img-w img-h)]
+                (.set (.-data img-data) buf)
+                (.putImageData ctx img-data 0 0))
+              (js/requestAnimationFrame draw-loop)))]
+    (js/requestAnimationFrame draw-loop)))</code></pre>
+      </section>
+    </main>
+
+    <footer>
+      <a href="https://github.com/SeniorCareMarket-com/eve">EVE on GitHub</a>
+    </footer>
+  </div>
+
+  <!-- Shim importScripts for main thread.
+       Release builds prepend importScripts("shared.js") to cljs-thread.js —
+       this shim loads those via sync XHR+eval so the page works without explicit
+       <script> tags for each dependent module. -->
+  <script>if(typeof importScripts==="undefined"){importScripts=function(){var xhr=new XMLHttpRequest();for(var i=0;i<arguments.length;i++){xhr.open("GET",arguments[i],false);xhr.send();if(xhr.status===200)(0,eval)(xhr.responseText);}};}</script>
+  <script src="cljs-thread.js"></script>
+  <script src="screen.js"></script>
+  <script>cljs_thread.main(raytracer.main.main, {"injest-count": navigator.hardwareConcurrency || 4})</script>
+  <!-- COI Service Worker for SharedArrayBuffer on GitHub Pages -->
+  <script src="coi-serviceworker.js"></script>
+</body>
+</html>

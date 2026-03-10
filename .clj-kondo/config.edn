@@ -1,15 +1,59 @@
-{:lint-as {cljs-thread.core/=>> clojure.core/->>}
- :hooks {:macroexpand {cljs-thread.core/in cljs-thread.core/in
-                       cljs-thread.core/future cljs-thread.core/future
-                       cljs-thread.core/spawn cljs-thread.core/spawn
-                       cljs-thread.core/wait cljs-thread.core/wait
-                       cljs-thread.core/in? cljs-thread.core/in?}}
- :config-in-call
- {cljs-thread.core/in
-  {:linters {:unresolved-symbol {:exclude [yield]}}}
-  cljs-thread.core/future
-  {:linters {:unresolved-symbol {:exclude [yield]}}}
-  cljs-thread.core/wait
-  {:linters {:unresolved-symbol {:exclude [yield]}}}
-  cljs-thread.core/spawn
-  {:linters {:unresolved-symbol {:exclude [yield]}}}}}
+{:linters
+ {;; Suppress false positives from deftype macro expansions
+  :unresolved-symbol {:exclude [(cljs-thread.eve.deftype.int-map)
+                                (cljs-thread.eve.deftype.rb-tree)
+                                ;; These files use macro-injected symbols that kondo doesn't understand
+                                ;; goog/exportSymbol with namespace aliases
+                                [cljs-thread.runner.thread-test-main deftype-test array-test
+                                 map-test vec-test list-test set-test large-scale-test
+                                 epoch-gc-test obj-test batch2-test batch3-test batch4-test
+                                 int-map-test rb-tree-test typed-array-test]]}
+
+  ;; Suppress private var access in xray (it needs internal access)
+  :private-call {:level :off}
+
+  ;; Wrong arity reports for protocol methods with specify
+  :invalid-arity {:skip-args [cljs.core/specify]}
+
+  ;; Unused private vars - exclude false positives from macro usage
+  :unused-private-var {:exclude [cljs-thread.eve-perf-test/rcw-cycle!]}
+
+  ;; Macros in :require-macros are used but kondo doesn't see them
+  :unused-referred-var {:level :warning}
+
+  ;; inline def is sometimes used for debugging in test files
+  :inline-def {:level :warning}
+
+  ;; Reduce noise from info-level hints
+  :single-operand-comparison {:level :off}
+  :single-key-in {:level :off}
+  :redundant-str-call {:level :off}
+  :redundant-let {:level :off}
+  :single-operand-use {:level :off}
+  :redundant-nested-call {:level :off}}
+
+ :lint-as {;; Tell kondo how to lint our macros
+           cljs-thread.core/in clojure.core/fn
+           cljs-thread.core/spawn clojure.core/fn
+           cljs-thread.core/future clojure.core/fn
+           cljs-thread.core/on-when clojure.core/when
+           cljs-thread.future/future clojure.core/fn}
+
+ :output {:exclude-files ["src/cljs_thread/eve/deftype/int_map.cljs"
+                          "src/cljs_thread/eve/deftype/rb_tree.cljs"
+                          ;; simd_wasm has deeply nested loops that confuse kondo's paren matching
+                          "src/cljs_thread/eve/deftype_proto/simd_wasm.cljs"
+                          ;; deftype-test uses macro-generated constructors
+                          "test/cljs_thread/eve/deftype_test.cljs"
+                          ;; array_test uses specialized macros
+                          "test/cljs_thread/eve/array_test.cljs"
+                          ;; direct_sab_sync_test uses future macro heavily
+                          "test/cljs_thread/direct_sab_sync_test.cljs"
+                          ;; thread_test_main uses goog/exportSymbol with aliases
+                          "test/cljs_thread/runner/thread_test_main.cljs"
+                          ;; pmap uses future macro
+                          "src/cljs_thread/pmap.cljs"
+                          ;; db uses macro-injected yield
+                          "src/cljs_thread/db.cljs"
+                          ;; sync uses specify with protocol methods
+                          "src/cljs_thread/sync.cljs"]}}

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reagami Counter — EVE + DOM Proxy (DEV)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
+    h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+    h1 + p { color: #555; margin-top: 0; }
+    #app { padding: 1rem; background: #f7f7f7; border-radius: 8px; margin: 1.5rem 0; }
+    button { font-size: 1rem; padding: 0.5rem 1rem; cursor: pointer; }
+    pre { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.85rem; line-height: 1.5; }
+    .kw { color: #569cd6; } .fn { color: #dcdcaa; } .str { color: #ce9178; }
+    .cmt { color: #6a9955; } .sym { color: #9cdcfe; } .mac { color: #c586c0; }
+    code { background: #eee; padding: 0.15em 0.35em; border-radius: 3px; font-size: 0.9em; }
+    .src-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+  </style>
+</head>
+<body>
+  <h1>Reagami Counter</h1>
+  <p>All logic runs in Web Workers — the DOM is proxied. (DEV)</p>
+
+  <div id="app">Loading...</div>
+
+  <div class="src-label">core.cljs</div>
+  <pre>(<span class="kw">ns</span> reagami-counter.core
+  (<span class="kw">:require-macros</span> [cljs-thread.core <span class="kw">:refer</span> [<span class="mac">future</span> <span class="mac">in</span> <span class="mac">spawn</span>]])
+  (<span class="kw">:require</span>
+   [cljs-thread.core]
+   [cljs-thread.eve <span class="kw">:as</span> e]
+   [reagami.core <span class="kw">:as</span> reagami]
+   [<span class="str">"d3"</span> <span class="kw">:as</span> d3]
+   [<span class="str">"canvas-confetti"</span> <span class="kw">:as</span> confetti]))
+
+<span class="cmt">;; we're in a worker right now...</span>
+
+(<span class="fn">defonce</span> <span class="sym">state</span> (e/<span class="fn">atom</span> <span class="kw">::state</span> {<span class="kw">:counter</span> 0}))
+
+(<span class="fn">defn</span> <span class="fn">update-bar!</span> [n]
+  (<span class="fn">-></span> (d3/<span class="fn">select</span> <span class="str">"#bar"</span>)
+      (.<span class="fn">transition</span>)
+      (.<span class="fn">duration</span> 300)
+      (.<span class="fn">attr</span> <span class="str">"width"</span> (<span class="fn">str</span> (* n 10) <span class="str">"%"</span>))))
+
+(<span class="fn">defn</span> <span class="fn">my-component</span> []
+  [<span class="kw">:div</span>
+   [<span class="kw">:svg</span> {<span class="kw">:width</span> <span class="str">"100%"</span> <span class="kw">:height</span> 40}
+    [<span class="kw">:rect#bar</span> {<span class="kw">:x</span> 0 <span class="kw">:y</span> 5 <span class="kw">:height</span> 30 <span class="kw">:fill</span> <span class="str">"#4CAF50"</span> <span class="kw">:rx</span> 4 <span class="kw">:width</span> 0}]]
+   [<span class="kw">:div</span> <span class="str">"Counted: "</span> @(<span class="mac">future</span> (* 100 (<span class="kw">:counter</span> @<span class="sym">state</span>)))]
+   [<span class="kw">:button</span>
+    {<span class="kw">:on-click</span> #(<span class="fn">let</span> [n (<span class="kw">:counter</span> (swap! <span class="sym">state</span> update <span class="kw">:counter</span> inc))]
+                  (<span class="fn">update-bar!</span> n)
+                  (<span class="fn">when</span> (= n 10)
+                    (confetti #js {<span class="kw">:particleCount</span> 200 <span class="kw">:spread</span> 70})))}
+    <span class="str">"Click me!"</span>]])
+
+(<span class="fn">defn</span> <span class="fn">render</span> []
+  (reagami/<span class="fn">render</span> (.querySelector js/document <span class="str">"#app"</span>) [<span class="fn">my-component</span>]))
+
+(<span class="fn">defn</span> <span class="fn">^:export main</span> []
+  (<span class="mac">spawn</span> <span class="kw">::renderer</span>
+    (add-watch <span class="sym">state</span> <span class="kw">::render</span> (<span class="fn">fn</span> [_ _ _ _] (<span class="fn">render</span>)))
+    (<span class="fn">render</span>)))</pre>
+
+  <div class="src-label">index.html</div>
+  <pre>&lt;div id=<span class="str">"app"</span>&gt;&lt;/div&gt;
+&lt;script&gt;if(typeof importScripts===<span class="str">"undefined"</span>)importScripts=function(){}&lt;/script&gt;
+&lt;script src=<span class="str">"cljs-thread.js"</span>&gt;&lt;/script&gt;
+&lt;script src=<span class="str">"screen.js"</span>&gt;&lt;/script&gt;
+&lt;script src=<span class="str">"../coi-serviceworker.js"</span>&gt;&lt;/script&gt;
+&lt;script&gt;<span class="sym">cljs_thread</span>.<span class="fn">main</span>(<span class="sym">reagami_counter</span>.<span class="sym">core</span>.<span class="fn">main</span>)&lt;/script&gt;</pre>
+
+  <!-- canvas-confetti is bundled into cljs-thread.js via npm -->
+
+  <!-- Shim importScripts for main thread — :web-worker true builds
+       emit importScripts() at the top. Workers have it natively. -->
+  <script>if(typeof importScripts==="undefined")importScripts=function(){}</script>
+  <!-- :cljs-thread module — fat kernel auto-detects this as worker kernel.
+       Must appear before coi-serviceworker.js so detect-kernel-url-browser!
+       probes this directory (dev/) first and finds the dev manifest.edn. -->
+  <script src="cljs-thread.js"></script>
+  <script src="screen.js"></script>
+  <!-- COI Service Worker for SharedArrayBuffer on GitHub Pages.
+       Loaded after cljs-thread.js so kernel URL detection probes dev/ first. -->
+  <script src="../coi-serviceworker.js"></script>
+  <script>cljs_thread.main(reagami_counter.core.main)</script>
+</body>
+</html>
