@@ -11,7 +11,8 @@
                                             :git/sha "562cf3d"}}}
   :thread-test
   {:extra-paths ["test" "target/generated-test"]
-   :extra-deps {thheller/shadow-cljs {:mvn/version "3.3.6"}}}
+   :extra-deps {thheller/shadow-cljs {:mvn/version "3.3.6"}}
+   :main-opts ["-m" "cljs-thread.test-runner"]}
   :test
   {:extra-paths ["test"]
    :extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
