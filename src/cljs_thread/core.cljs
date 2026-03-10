@@ -15,7 +15,7 @@
    [cljs-thread.repl]
    ;; eve must load before future - auto-init! binds AtomDomain needed for pool atom
    [cljs-thread.eve :as eve]
-   [cljs-thread.eve.shared-atom :as a]
+   [eve.shared-atom :as a]
    [cljs-thread.future :as f]
    [cljs-thread.injest :as i]
    [cljs-thread.pmap]

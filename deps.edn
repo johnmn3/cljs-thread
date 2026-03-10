@@ -5,16 +5,13 @@
                                    :git/sha "0e084fffeb0d9f2a8754c812be60bc22d2991a75"}}
  :aliases
  {:node-test
-  {:extra-paths ["test" "target/generated-test"
-                 ;; Eve test namespaces from the git dep (needed for thread-test runner)
-                 "/root/.gitlibs/libs/eve/eve/0e084fffeb0d9f2a8754c812be60bc22d2991a75/test"]
+  {:extra-paths ["test" "target/generated-test"]
    :extra-deps {thheller/shadow-cljs {:mvn/version "3.3.6"}
                 io.github.borkdude/reagami {:git/tag "v0.0.36"
                                             :git/sha "562cf3d"}}}
   :thread-test
   {:extra-paths ["test" "target/generated-test"]
-   :extra-deps {thheller/shadow-cljs {:mvn/version "3.3.6"}}
-   :main-opts ["-m" "eve.test-runner"]}
+   :extra-deps {thheller/shadow-cljs {:mvn/version "3.3.6"}}}
   :test
   {:extra-paths ["test"]
    :extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
