@@ -5,9 +5,28 @@
    [cljs-thread.macro-impl :as i]))
 
 (defmacro tfan [conveyer names xf-group]
-  (let [yfn `(clojure.core/fn ~names (injest.impl/compose-transducer-group ~xf-group))]
-    `(do (fn [args#]
-           (cljs-thread.injest/fan ~conveyer ~yfn args#)))))
+  ;; Simple approach: let `in` handle serialization.
+  ;; - `chunk#` is a local that `in` will capture automatically
+  ;; - `xf-group` is a compile-time literal embedded in the code
+  `(fn [args#]
+     (let [;; Get injest-ids from config, converting strings to keywords
+           conf-val# @cljs-thread.state/conf
+           raw-ids# (:injest-ids conf-val#)
+           injest-ids# (or (clojure.core/seq (clojure.core/map clojure.core/keyword raw-ids#))
+                           (cljs-thread.injest/mk-injest-ids (:injest-count conf-val#)))
+           chunks# (clojure.core/partition-all 512 args#)
+           worker-cycle# (clojure.core/cycle injest-ids#)]
+       (->> (clojure.core/map
+              (fn [w# chunk#]
+                (cljs-thread.in/in w#
+                  ;; Use vec to realize the sequence - eve atoms may not handle lazy seqs
+                  (clojure.core/vec
+                    (clojure.core/sequence
+                      (cljs-thread.injest/compose-xf ~xf-group)
+                      chunk#))))
+              worker-cycle# chunks#)
+            (clojure.core/mapcat clojure.core/deref)
+            clojure.core/vec))))
 
 (defn pre-transducify-thread [conveyer names env minimum-group-size t-fn t-pred thread]
   (->> thread

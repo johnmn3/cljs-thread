@@ -2,101 +2,428 @@
   (:require-macros
    [cljs-thread.in])
   (:require [clojure.edn :as edn]
-            [clojure.walk :refer [postwalk]]
             [cljs-thread.env :as e]
+            [cljs-thread.eve :as eve]
+            [cljs-thread.go]
             [cljs-thread.id :refer [get-id IDable]]
             [cljs-thread.msg :as m]
+            [cljs-thread.perf :as perf]
+            [cljs-thread.platform :as p]
+            [cljs-thread.serial :as serial]
             [cljs-thread.state :as s]
             [cljs-thread.sync :as sync]
             [cljs-thread.util :as u]))
 
-(defn instr-body [transfer-atom pl]
-  (let [body (postwalk
-              #(cond (fn? %) (str "#cljs-thread/arg-fn " %)
-                     (u/typed-array? %)
-                     (let [c-tag (:count (swap! transfer-atom update :count inc))
-                           t (type %)]
-                       (swap! transfer-atom assoc-in [:transfers c-tag]
-                              (merge
-                               {:obj %}
-                               (when-not (and (exists? js/SharedArrayBuffer) (= (type %) js/SharedArrayBuffer))
-                                 {:transfer (.-buffer %)})))
-                       (str "#cljs-thread/transferable " {:c-tag c-tag :transfer-type t}))
-                     :else %)
-              pl)]
-    body))
+;; Re-export for backwards compatibility
+(def instr-body serial/instr-body)
+(def unstr-body serial/unstr-body)
 
-(defn unstr-body [transfers pl]
-  (postwalk
-   #(if-not (and (string? %) (or (.startsWith % "#cljs-thread/transferable")
-                                 (.startsWith % "#cljs-thread/arg-fn")))
-      %
-      (cond (.startsWith % "#cljs-thread/arg-fn")
-            (js/eval (str "(function () {return (" (apply str (drop 20 %)) ");})();"))
-            (.startsWith % "#cljs-thread/transferable")
-            (let [transfer-map (edn/read-string (apply str (drop 26 %)))
-                  {:keys [c-tag transfer-type]} transfer-map
-                  transfers-clj (js->clj transfers :keywordize-keys true)
-                  {:keys [obj]} (get transfers-clj c-tag)]
-              obj)
-            :else %))
-   pl))
+(defn- debug-log! [msg]
+  ;; Debug logging disabled
+  nil)
+
+;; ---------------------------------------------------------------------------
+;; On-demand module loading (catch-and-load)
+;;
+;; Under Closure advanced compilation with code splitting, exported
+;; functions are accessible via $APP.ns.fn names. When a worker eval's
+;; a stringified function referencing such names but the module hasn't
+;; been loaded yet, a ReferenceError occurs. The catch-and-load mechanism:
+;; 1. Catches the ReferenceError
+;; 2. Loads the missing module(s) normally (respecting IIFE boundaries)
+;; 3. Module init code runs, setting up exports on $APP
+;; 4. Retries the original call — exported names now resolve
+;;
+;; Note: functions referenced from worker-eval'd code must be ^:export
+;; or their namespace must be in :shared {:entries [...]} so Closure
+;; gives them stable $APP.ns.fn names.
+;; ---------------------------------------------------------------------------
+
+(defonce ^:private modules-loaded? (atom false))
+
+(defn- resolve-module-url
+  "Resolve module URL for browser workers. In blob/eval workers,
+   self.origin is 'null', so we use __cljs_thread_origin set by strategies."
+  [url]
+  (if (or (.startsWith url "http://") (.startsWith url "https://"))
+    url
+    (if (and (exists? js/globalThis.__cljs_thread_origin)
+             (some? js/globalThis.__cljs_thread_origin))
+      (let [origin js/globalThis.__cljs_thread_origin]
+        (if (.startsWith url "/")
+          (str origin url)
+          (str origin "/" url)))
+      url)))
+
+(defn- load-module!
+  "Load a JS module by evaluating it in global scope. The module's IIFE
+   runs normally, setting up namespace exports on $APP. Only ^:export
+   functions become accessible; non-exported vars remain closure-scoped."
+  [url]
+  (let [source (if p/node?
+                 (let [^js fs (js* "require('fs')")]
+                   (.readFileSync fs url "utf8"))
+                 (let [resolved (resolve-module-url url)
+                       xhr (js/XMLHttpRequest.)]
+                   (.open xhr "GET" resolved false)
+                   (.send xhr)
+                   (.-responseText xhr)))]
+    (js* "(0,eval)(~{})" source)))
+
+(defn ensure-modules-loaded!
+  "Load all configured :loadable-modules normally (eval as-is).
+   Module init code runs, exports become available. Only runs once
+   per worker lifetime."
+  []
+  (when-not @modules-loaded?
+    (when-let [modules (:loadable-modules @s/conf)]
+      (doseq [url modules]
+        (try
+          (load-module! url)
+          (catch :default e
+            (println :warn :failed-to-load-module url e)))))
+    (reset! modules-loaded? true)))
+
+(def ^:private loop-iife-re
+  "Matches CLJS compiler loop-capture IIFEs:
+     ((function (P1,P2,...){ return EXPR; })(P1,P2,...))
+   The backreference \\1 ensures the invocation args are identical to the
+   parameter list — the distinguishing signature of a loop-capture IIFE.
+   Replacement is just EXPR (the inner function), stripping the wrapper
+   that would otherwise reference loop variables not present on the
+   target worker."
+  (js/RegExp. "\\(\\(function\\s*\\(([^)]+)\\)\\s*\\{\\s*return\\s+([\\s\\S]*?);\\s*\\}\\)\\(\\1\\)\\)" "g"))
+
+(defn- strip-loop-iifes
+  "Strip CLJS compiler loop-capture IIFEs from a stringified function.
+   Only needed for go-transformed bodies whose CPS continuation fns may
+   have been wrapped by the compiler inside dotimes / loop constructs."
+  [s]
+  (.replace s loop-iife-re "$2"))
+
+(def ^:private shadow-param-re
+  "Matches a CLJS shadow-renamed parameter name like per__$1.
+   Captures the base name (everything before the final __$N suffix)."
+  (js/RegExp. "^(.+)__\\$(\\d+)$"))
+
+(defn inject-shadow-aliases
+  "Fix CLJS shadow-rename mismatch in serialized functions.
+
+   When the future/in/spawn macros generate (fn [x y z] ...) where x, y, z
+   are already locals in the enclosing scope, CLJS renames the parameters
+   to x__$1, y__$1, z__$1 to avoid shadowing. But IIFEs generated by the
+   CLJS compiler for closures inside loops reference the ORIGINAL names,
+   causing ReferenceError on the worker where only the __$1 versions exist.
+
+   This function injects `var x=x__$1,y=y__$1,...;` after the outer
+   function's opening brace, making both names available in scope."
+  [sfn]
+  (let [m (.exec (js/RegExp. "^function\\s*\\(([^)]*?)\\)\\s*\\{") sfn)]
+    (if (or (nil? m) (= "" (aget m 1)))
+      sfn
+      (let [params (.split (aget m 1) ",")
+            aliases (array)]
+        (dotimes [i (.-length params)]
+          (let [p (.trim (aget params i))
+                sm (.exec shadow-param-re p)]
+            (when sm
+              (.push aliases (str (aget sm 1) "=" p)))))
+        (if (zero? (.-length aliases))
+          sfn
+          (let [decl (str "var " (.join aliases ",") ";")
+                idx  (inc (.indexOf sfn "{"))]
+            (str (.substring sfn 0 idx) decl (.substring sfn idx))))))))
+
+;; ---------------------------------------------------------------------------
+;; Item 4: eval memoization — fn-string → compiled Function cache
+;;
+;; `in :screen` fn bodies are stringified at COMPILE TIME (fixed strings).
+;; Re-evaluating the same string on every call wastes V8 compile time.
+;; Cache the compiled Function object keyed on the string — 1 eval per
+;; unique call site, then O(1) map lookup for all subsequent calls.
+;;
+;; Lives on the screen thread (do-call runs there). Memory: ~1-4KB per
+;; unique `in :screen` call site; bounded by number of call sites in app.
+;; ---------------------------------------------------------------------------
+
+(defonce ^:private fn-cache (js/Map.))
+
+(defn- eval-or-cached
+  "Return the compiled Function for sfn, using fn-cache to avoid re-eval.
+   Uses the wrapper form `(function(){return(sfn);})()` to extract sfn as
+   a callable value without invoking it — callers decide when to call it."
+  [sfn]
+  (or (.get fn-cache sfn)
+      (let [f (js/eval (str "(function () {return (" sfn ");})();"))]
+        (.set fn-cache sfn f)
+        f)))
+
+(defn- execute-call
+  "Execute a stringified function call with optional arguments."
+  [sfn sargs opts in-id transfers direct-sync? sync-signal-sab sync-atom-id sync-atom-idx]
+  (if (or (nil? sfn) (= sfn "nil"))
+    nil
+    (let [sfn (inject-shadow-aliases sfn)
+          sfn (if (:go? opts) (strip-loop-iifes sfn) sfn)]
+      (if-not sargs
+        (if (and in-id (:yield? opts))
+          (((eval-or-cached sfn)) in-id direct-sync? sync-signal-sab sync-atom-id sync-atom-idx)
+          ((eval-or-cached sfn)))
+        ;; sargs is now a pr-str'd vector - parse it, then unstr-body to restore markers
+        (let [parsed-sargs (if (string? sargs)
+                             (edn/read-string sargs)
+                             sargs)]
+          (apply (if (and in-id (:yield? opts))
+                   ((eval-or-cached sfn) in-id direct-sync? sync-signal-sab sync-atom-id sync-atom-idx)
+                   (eval-or-cached sfn))
+                 (if (vector? parsed-sargs)
+                   (->> parsed-sargs (mapv (partial unstr-body transfers)))
+                   (js/eval (str "(" sargs ")();")))))))))
+
+(defn- reconstruct-sync-channel
+  "Reconstruct sync-channel from message components."
+  [{:keys [sync-signal-sab sync-atom-id sync-atom-idx in-id]}]
+  (when sync-signal-sab
+    (debug-log! (str "[reconstruct-sync-channel] in-id=" in-id " atom-id=" sync-atom-id " hdr-idx=" sync-atom-idx))
+    {:signal-sab sync-signal-sab
+     :response-atom (eve/reconstruct-shared-atom sync-atom-id sync-atom-idx)}))
+
+(defn- send-result!
+  "Send result via direct sync, Node.js screen message, or legacy coordinator path."
+  [{:keys [direct-sync? sync-signal-sab in-id from] :as data} result opts error-sent?]
+  (debug-log! (str "[send-result!] env:" (:id e/data) " direct-sync?:" direct-sync? " sync-signal-sab?:" (boolean sync-signal-sab) " in-id:" in-id " from:" from))
+  (when-not (e/in-sw?)
+    (let [sab-check (instance? js/SharedArrayBuffer sync-signal-sab)
+          size-check (and sab-check (pos? (.-byteLength sync-signal-sab)))]
+      (debug-log! (str "[send-result!] sab-check:" sab-check " size-check:" size-check " sab-type:" (type sync-signal-sab)))
+      (cond
+        ;; Direct SAB sync: deliver via sync-channel
+        (and direct-sync? sab-check size-check)
+        (let [sync-ch (reconstruct-sync-channel data)
+              ^js ra (:response-atom sync-ch)]
+          (debug-log! (str "[send-result!] delivering via direct sync: result=" result
+                           " atom-id=" (.-shared-atom-id ra) " hdr-idx=" (.-header-descriptor-idx ra)
+                           " in-id=" in-id))
+          (sync/deliver-response sync-ch in-id result))
+
+        ;; Screen caller (Node or browser+SAB): send result via message posting
+        (and (= from :screen) (or p/node? p/sab-sync?))
+        (do
+          (debug-log! (str "[send-result!] posting to screen, in-id:" in-id))
+          (reset! error-sent? true)
+          ;; Include :to :screen for the proxy handler to route correctly
+          (m/post :screen {:dispatch :in-result
+                           :data {:in-id in-id :result result :to :screen}}))
+
+        ;; Legacy coordinator path - use in-id if request-id not in opts
+        :else
+        (let [req-id (or (:request-id opts) in-id)]
+          (debug-log! (str "[send-result!] using legacy path, req-id:" req-id))
+          (when req-id
+            (reset! error-sent? true)
+            (sync/send-response {:request-id req-id :response result})))))))
 
 (defn do-call
   [{:keys [data] :as outer-data}]
-  (let [{:keys [sfn sargs opts in-id local? transfers]} data
-        res (try
-              (if (or (nil? sfn) (= sfn "nil"))
-                nil
-                (if-not sargs
-                  (if (and in-id (:yield? opts))
-                    ((js/eval (str "(" sfn ")();")) in-id)
-                    (js/eval (str "(" sfn ")();")))
-                  (apply (if (and in-id (:yield? opts))
-                           ((js/eval (str "(function () {return (" sfn ");})();")) in-id)
-                           (js/eval (str "(function () {return (" sfn ");})();")))
-                         (if (vector? sargs)
-                           (->> sargs (mapv (partial unstr-body transfers)))
-                           (js/eval (str "(" sargs ")();"))))))
-              (catch :default e
-                (println :error-in (:id e/data))
-                (println :error-in-do-call e)
-                (println :error (.-error e))
-                (println :data data)
-                (when-not (e/in-sw?)
-                  (sync/send-response {:request-id (:request-id opts) :response {:error (pr-str e)}}))))]
+  (debug-log! (str "[do-call] env:" (:id e/data) " direct-sync?:" (:direct-sync? data) " sync-signal-sab?:" (boolean (:sync-signal-sab data)) " in-id:" (:in-id data)))
+  (let [{:keys [sfn sargs opts in-id local? transfers direct-sync? sync-signal-sab sync-atom-id sync-atom-idx __perf]} data
+        ;; Item 12: capture T2 (screen message received) when RTT timing is enabled.
+        ;; Use Date.now() — wall-clock time shared across all threads, so
+        ;; cross-thread subtraction (T2-T1, T4-T3) is valid.  performance.now()
+        ;; has a per-context time origin and produces garbage when subtracted
+        ;; across thread boundaries.
+        t2 (when __perf (js/Date.now))
+        ;; Track whether error handler already sent a response
+        error-sent? (atom false)
+        ;; Set *in-work* = true so that spawn inside in/spawn/future bodies
+        ;; can detect they're in an explicit work context (prevents spawn storms).
+        ;; This MUST be done here (not in the macro body) because the macro body
+        ;; is stringified + eval'd — the dynamic var's IIFE-local alias isn't
+        ;; accessible from eval's global scope in code-split browser builds.
+        res (binding [s/*in-work* true]
+              (try
+                (execute-call sfn sargs opts in-id transfers direct-sync? sync-signal-sab sync-atom-id sync-atom-idx)
+                (catch :default e
+                  (if (and (instance? js/ReferenceError e)
+                           (not @modules-loaded?)
+                           (seq (:loadable-modules @s/conf)))
+                    ;; ReferenceError + unloaded modules: load them and retry once
+                    (do
+                      (ensure-modules-loaded!)
+                      (try
+                        (execute-call sfn sargs opts in-id transfers direct-sync? sync-signal-sab sync-atom-id sync-atom-idx)
+                        (catch :default e2
+                          (println :error-in (:id e/data))
+                          (println :error-after-module-load e2)
+                          (println :data data)
+                          (send-result! data {:error (pr-str e2)} opts error-sent?))))
+                    ;; Non-ReferenceError or modules already loaded
+                    (do
+                      (println :error-in (:id e/data))
+                      (println :error-in-do-call e)
+                      (println :error (.-error e))
+                      (println :data data)
+                      (send-result! data {:error (pr-str e)} opts error-sent?))))))
+        ;; Item 12: capture T3 (eval + execute complete) when RTT timing is enabled
+        t3 (when __perf (js/Date.now))]
     (when (:atom? opts)
       (reset! s/local-val res))
     (if local?
       res
-      (when (and (not (:yield? opts)) (not (e/in-sw?)))
-        (sync/send-response {:request-id (:request-id opts) :response res})))))
+      (if (and (:go? opts) (instance? js/Promise res))
+        ;; Go-body returned a Promise — chain response on resolution
+        (-> res
+            (.then (fn [value]
+                     (send-result! data value opts error-sent?)))
+            (.catch (fn [err]
+                      (send-result! data {:error (pr-str err)} opts error-sent?))))
+        ;; Only send response if error handler didn't already send one
+        (when (and (not @error-sent?) (not (:yield? opts)) (not (:go? opts)) (not (e/in-sw?)))
+          ;; Item 12: wrap result with T2/T3 screen timestamps when RTT timing active
+          (send-result! data
+                        (if __perf {:__result res :__t2 t2 :__t3 t3} res)
+                        opts error-sent?))))))
 
 
 (defmethod m/dispatch :call
   [data]
   (do-call data))
 
-(defn do-in [id & [args afn opts]]
+(defn yield-result!
+  "Send yield result via direct sync or legacy coordinator path.
+   Called from yield-mode functions generated by the `in` macro."
+  [in-id direct-sync? sync-signal-sab sync-atom-id sync-atom-idx result]
+  (debug-log! (str "[yield-result!] in-id:" in-id " direct-sync?:" direct-sync?))
+  (if (and direct-sync? (instance? js/SharedArrayBuffer sync-signal-sab))
+    ;; Direct SAB sync: deliver via reconstructed sync-channel
+    (let [sync-ch {:signal-sab sync-signal-sab
+                   :response-atom (eve/reconstruct-shared-atom sync-atom-id sync-atom-idx)}]
+      (debug-log! "[yield-result!] delivering via direct sync")
+      (sync/deliver-response sync-ch in-id result))
+    ;; Legacy coordinator path
+    (do
+      (debug-log! (str "[yield-result!] using legacy path, in-id:" in-id))
+      (when in-id
+        (sync/send-response {:request-id in-id :response result})))))
+
+(defn ^:export do-in [id & [args afn opts]]
+  (debug-log! (str "[do-in] env:" (:id e/data) " target:" (pr-str id) " opts:" (pr-str opts)))
   (let [[afn args] (if afn [afn args] [args nil])
+        ;; Item 12: capture T0 (pre-serialize) when RTT timing is enabled.
+        ;; Use Date.now() throughout so all 5 timestamps share the same
+        ;; wall-clock epoch — cross-thread subtraction is then valid.
+        perf? (perf/enabled?)
+        perf-t0 (when perf? (js/Date.now))
         in-id (u/gen-id)
         transfer-atom (atom {:count 0 :transfers {}})
-        sargs (->> args (mapv (partial instr-body transfer-atom)))
-        id (if (satisfies? IDable id)
-             (get-id id)
-             id)
-        id (if (keyword id)
-             id
-             (pr-str id))
-        post-in #(m/post id
+        ;; instr-body strips transferables/JS objects into markers
+        ;; then pr-str preserves CLJS types (keywords, etc.) through the wire
+        sargs-instrumented (->> args (mapv (partial instr-body transfer-atom)))
+        sargs (pr-str sargs-instrumented)
+        ;; Get the raw id for peer lookup (works with keywords and strings)
+        raw-id (if (satisfies? IDable id)
+                 (get-id id)
+                 id)
+        ;; Serialized id for the message payload - keywords stay as-is, strings get pr-str'd
+        id (if (keyword? raw-id)
+             raw-id
+             (pr-str raw-id))
+        ;; Get or create sync-channel for direct SAB sync
+        ;; Each request gets a fresh signal-sab, but can share the peer's response-atom
+        ;; (response-atom uses {in-id -> result} map to support concurrent requests)
+        ;; Use raw-id directly for peer lookup (preserves string UUIDs and keyword ids)
+        peer-sync-ch (get-in @s/peers [raw-id :sync-channel])
+        peer-response-atom (when peer-sync-ch (:response-atom peer-sync-ch))
+        ;; Direct SAB sync: point-to-point blocking via SharedArrayBuffer + eve atom
+        use-direct-sync? (and (or p/node? p/sab-sync?)
+                              (not (:promise? opts))
+                              (not (e/in-screen?)))  ;; screen can't block
+        _ (debug-log! (str "[do-in] use-direct-sync?:" use-direct-sync? " node?:" p/node? " promise?:" (:promise? opts) " in-screen?:" (e/in-screen?)))
+        ;; Always create fresh signal-sab per request to avoid signal collisions
+        ;; Reuse peer's response-atom if available (concurrent-safe via KV map)
+        sync-ch (when use-direct-sync?
+                  (if peer-response-atom
+                    (sync/make-sync-channel peer-response-atom)
+                    (sync/make-sync-channel)))
+        _ (when sync-ch
+            (let [^js ra (:response-atom sync-ch)]
+              (debug-log! (str "[do-in] sync-ch: atom-id=" (.-shared-atom-id ra)
+                               " hdr-idx=" (.-header-descriptor-idx ra)
+                               " in-id=" in-id
+                               " reused-peer-atom?=" (boolean peer-response-atom)))))
+        ;; For screen callers (Node or browser+SAB): use Promise-based result delivery via messages
+        use-node-screen-promise? (and (or p/node? p/sab-sync?) (e/in-screen?))
+        ;; Use raw-id for m/post (peer lookup), but id (serialized) for message payload
+        post-in #(m/post raw-id
                          {:dispatch :call
                           :data (merge
-                                 {:sfn afn :to id :in-id in-id}
+                                 {:sfn afn :to id :in-id in-id
+                                  :from (:id e/data)}  ;; Include caller for response routing
                                  (when args
                                    {:sargs sargs})
                                  (when-let [transfers (:transfers @transfer-atom)]
                                    {:transfers transfers})
                                  (when opts
-                                   {:opts (assoc opts :request-id in-id)}))})]
+                                   {:opts (assoc opts :request-id in-id)})
+                                 ;; Include sync-channel components for direct SAB sync
+                                 (when sync-ch
+                                   (let [^js response-atom (:response-atom sync-ch)]
+                                     {:direct-sync? true
+                                      :sync-signal-sab (:signal-sab sync-ch)
+                                      :sync-atom-id (.-shared-atom-id response-atom)
+                                      :sync-atom-idx (.-header-descriptor-idx response-atom)}))
+                                 ;; Item 12: signal screen to capture T2/T3 timestamps
+                                 (when perf? {:__perf true}))})]
     (post-in)
-    (sync/wrap-derefable (merge opts {:id in-id}))))
+    ;; Item 12: capture T1 (post-serialize, postMessage sent)
+    (let [perf-t1 (when perf? (js/Date.now))]
+      (cond
+        use-direct-sync?
+        (do
+          (debug-log! (str "[do-in] returning wrap-derefable-direct, in-id=" in-id))
+          (sync/wrap-derefable-direct {:id in-id :sync-channel sync-ch
+                                       :perf-t0 perf-t0 :perf-t1 perf-t1}))
+
+      use-node-screen-promise?
+      ;; Node.js screen: use Promise-based result delivery via messages
+      ;; Worker will post back via m/post :screen {:dispatch :in-result ...}
+      (do
+        (debug-log! (str "[do-in] returning node-screen-promise, in-id=" in-id))
+        (let [resolved? (atom false)
+              resolved-value (atom nil)
+              p (js/Promise. (fn [resolve reject]
+                               ;; Wrap resolve to also update atoms
+                               (swap! s/requests assoc in-id
+                                      {:resolve (fn [result]
+                                                  (reset! resolved? true)
+                                                  (reset! resolved-value result)
+                                                  (resolve result))
+                                       :reject reject})))]
+          (specify p
+                   IDable
+                   (get-id [_] in-id)
+                   IPending
+                   (-realized? [_] @resolved?)
+                   IDeref
+                   (-deref [_]
+                     (if @resolved?
+                       @resolved-value
+                       ;; Return the Promise for async resolution
+                       p)))))
+
+        :else
+        (do
+          (debug-log! (str "[do-in] returning wrap-derefable (legacy), in-id=" in-id))
+          (sync/wrap-derefable (merge opts {:id in-id})))))))
+
+;; ---------------------------------------------------------------------------
+;; Eager module loading for workers
+;;
+;; When :loadable-modules is configured (auto-detected as just the screen
+;; module), eagerly load it at worker startup. This makes non-exported vars
+;; globally accessible before any do-call or do-future execution.
+;; The catch-and-load in do-call serves as a safety net.
+;; ---------------------------------------------------------------------------
+
+(when (and (not (e/in-screen?)) (not (e/in-sw?)))
+  (ensure-modules-loaded!))

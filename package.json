@@ -1,0 +1,26 @@
+{
+  "name": "cljs-thread",
+  "version": "1.0.0",
+  "description": "cljs-thread: zero-config Web Worker / worker_threads for ClojureScript",
+  "scripts": {
+    "test": "npx shadow-cljs compile node-test",
+    "test:browser": "npx shadow-cljs compile browser-test && npx playwright test test/e2e/cljs-tests.spec.js",
+    "test:integration": "npx shadow-cljs compile integration-sw integration && npx playwright test test/e2e/integration.spec.js",
+    "test:sw-fallback": "npx shadow-cljs compile sw-fallback-sw sw-fallback-browser && npx playwright test --config test/e2e/playwright-sw-fallback.config.js",
+    "test:all": "npx shadow-cljs compile node-test browser-test integration-sw integration sw-fallback-sw sw-fallback-browser && npx playwright test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "canvas-confetti": "^1.9.4",
+    "d3": "^7.9.0",
+    "eve-native": "github:SeniorCareMarket/eve#main",
+    "shadow-cljs": "^3.3.6",
+    "wabt": "^1.0.39"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "serve": "^14.2.5"
+  }
+}

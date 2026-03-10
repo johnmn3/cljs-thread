@@ -1,380 +1,173 @@
-# `cljs-thread`: `spawn`, `in`, `future`, `pmap`, `pcalls`, `pvalues` and `=>>`
+# `cljs-thread`: `spawn`, `in`, `future`, `pmap`, `pcalls`, `pvalues`, `=>>` and shared `atom`
 
-## _"One step closer to threads on the web"_
+## _"Two steps closer to threads on the web"_
 
-`cljs-thread` makes using webworkers take less... work. Eventually, I'd like it to be able to minimize the amount of build tool configuration it takes to spawn workers in Clojurescript too, but that's a longer term goal.
+`cljs-thread` brings familiar threading primitives to ClojureScript - both in the browser (Web Workers) and on Node.js (`worker_threads`). Zero configuration required. Zero copy persistent data structures managed by shared atoms backed by SharedArrayBuffers.
 
-When you `spawn` a node, it automatically creates connections to all the other nodes, creating a fully connected mesh.
-
-The `in` macro then abstracts over the message passing infrastructure, with implicit binding conveyance and blocking semantics, allowing you to do work on threads in a manner similar to what you would experience with threads in Clojure and other languages. `cljs-thread` provides familiar constructs like `future`, `pmap`, `pcalls` and `pvalues`. For transducing over large sequences in parallel, the `=>>` thread-last macro is provided.
-
-## Getting Started
-
-### deps.edn
-Place the following in the `:deps` map of your `deps.edn` file:
+```html
+<div id="app"></div>
+<script src="cljs-thread.js"></script>
+<script src="screen.js"></script>
+<script>cljs_thread.main(reagami_counter.core.main)</script>
 ```
-...
-net.clojars.john/cljs-thread {:mvn/version "0.1.0-alpha.4"}
-...
+
+<img width="400" alt="reagami counter with D3 bar and confetti" src="docs/reagami-counter/reagami-counter-screenshot.png">
+
+```clojure
+(ns reagami-counter.core
+  (:require-macros [cljs-thread.core :refer [future in spawn]])
+  (:require
+   [cljs-thread.core :as t]
+   [reagami.core :as reagami]
+   ["d3" :as d3]
+   ["canvas-confetti" :as confetti]))
+
+;; we're in a worker right now...
+
+(defonce state (t/atom ::state {:counter 0}))
+
+(defn update-bar! [n]
+  (-> (d3/select "#bar")
+      (.transition)
+      (.duration 300)
+      (.attr "width" (str (* n 10) "%"))))
+
+(defn my-component []
+  [:div
+   [:svg {:width "100%" :height 40}
+    [:rect#bar {:x 0 :y 5 :height 30 :fill "#4CAF50" :rx 4 :width 0}]]
+   [:div "Counted: " @(future (* 100 (:counter @state)))]
+   [:button
+    {:on-click #(let [n (:counter (swap! state update :counter inc))]
+                  (update-bar! n)
+                  (when (= n 10)
+                    (confetti #js {:particleCount 200 :spread 70})))}
+    "Click me!"]])
+
+(defn render []
+  (reagami/render (.querySelector js/document "#app") [my-component]))
+
+(def renderer
+  (spawn ::renderer
+    (add-watch state ::render (fn [_ _ _ _] (render)))))
+
+(defn ^:export main []
+  (in renderer (render)))
 ```
-### Build Tools
-#### Shadow-cljs
-You'll want to put something like this in the build section of your `shadow-cljs.edn` file:
+
+### True Shared Persistent Data Structures
+`t/atom` creates an atom backed by **EVE** (Extensible Value Encoding) - a persistent data structure engine built directly on `SharedArrayBuffer`. Pass a namespace-qualified keyword as the first argument (e.g., `::state`) to register the atom globally - when other workers call `defonce` with the same ID, they get the existing atom instead of creating a new one. EVE maps, vectors, and sets live in shared memory, so every worker sees the same data without serialization or copying. `swap!`, `assoc`, `update`, and all standard Clojure operations work in-place on the shared buffer with zero-copy semantics across threads.
+
+### Real Parallelism
+`future` dispatches to the thread pool - the `swap!` and counter multiplication execute off the core thread.
+
+**Blocking semantics** via direct `SharedArrayBuffer` sync - workers communicate peer-to-peer using sync channels (`Atomics.wait` / `Atomics.notify` + EVE atoms). A Service Worker fallback is available for environments without COOP/COEP headers.
+
+See **[Architecture](doc/07-architecture.md)** for the full picture.
+### DOM Proxy _("core is the new main")_
+The DOM proxy transparently routes `document.querySelector` calls back to the screen thread, so libraries that assume DOM access work unmodified in workers. D3 and `canvas-confetti` both run entirely in the worker at smooth 60fps — no `(in :screen ...)` required. `renderer` is a named worker handle; `(in renderer ...)` executes any expression in that specific worker. Cross-thread watch notification (via `Atomics.waitAsync`) re-renders automatically when any worker mutates the atom.
+
+### **The Mental Shift**
+Move your headspace out of the "main" thread and into the `:core` worker - that becomes your new "main" thread. A DOM proxy lets all workers talk to the DOM, so the browser's UI thread becomes the "screen" thread and you never have to touch it again. Just add the `cljs_thread.main(...)` call to your HTML and your project's `main` launches natively in a worker instead of on screen. It feels like the main thread, but with Clojure/JVM-style parallelism.
+
+## Quickstart
+
+Add to `deps.edn`:
+
+```clojure
+net.clojars.john/cljs-thread {:mvn/version "0.1.0-alpha.5"}
 ```
- :builds
- {:repl ; <- just for getting a stable connection for repling, optional
-  {:target :browser
-   :output-dir "resources/public"
-   :modules {:repl {:entries [dashboard.core]
-                    :web-worker true}}}
-  :sw
-  {:target :browser
-   :output-dir "resources/public"
-   :modules {:sw {:entries [dashboard.core]
-                  :web-worker true}}}
-  :core
+
+Minimal `shadow-cljs.edn`:
+
+```clojure
+{:builds
+ {:app
   {:target     :browser
-   :output-dir "resources/public"
-   :modules
-   {:shared {:entries []}
-    :screen
-    {:init-fn dashboard.screen/init!
-     :depends-on #{:shared}}
-    :core
-    {:init-fn dashboard.core/init!
-     :depends-on #{:shared}
-     :web-worker true}}}}}
+   :output-dir "resources/public/js"
+   :modules    {:cljs-thread {:entries    [cljs-thread.core my-app.core]
+                              :web-worker true}
+                :screen      {:entries    [cljs-thread.dom.app]
+                              :depends-on #{:cljs-thread}}}}}}
 ```
-You can get by with less, but if you want a comfortable repling experience then you want your build file to look something similar to the above. Technically, you can get get by with just a single build artifact if you're careful enough in your worker code to never access `js/window`, `js/document`, etc. But, by having a `screen.js` artifact, you can more easily separate your "main thread" code from your web worker code. Having a separate service worker artifact (`:sw`) is fine because it doesn't need your deps - we only use it for getting blocking semantics in web workers. Having a separate `:repl` artifact is helpful for when you're using an IDE that only allows you to select repl connections on a per-build-id basis (such as VsCode Calva, which I use).
 
-The sub-project in this repo - `shadow_dashboard` - has an example project with a working build config (similar to the above) that you can use as an example to get started.
+Two modules: `:cljs-thread` runs in workers and `:screen` handles DOM rendering. See the **[Getting Started](doc/01-getting-started.md)** guide for more options.
 
-To launch the project in Calva, type `shift-cmd-p` and choose _"Start a Project REPL and Connect"_ and then enable the three build options that come up. When it asks which build you want to connect to, select `:repl`. You can also connect to `:screen` and that will be a stable connection as well. For `:core`, however, in the above configuration, there will be lots of web worker connections pointed to it and you can't control which one will have ended up as the current connection.
+## API at a Glance
 
-You can choose in Calva which build your are currently connected to by typing `shift-cmd-p` and choosing _"Select CLJS Build Connection"_.
+| Primitive | What it does | Example |
+|-----------|-------------|---------|
+[ `atom` | Create a shared worker | `(t/atom ::app-state {:counter 0})` |
+| `spawn` | Create a worker, run code in it | `@(spawn (+ 1 2 3))` |
+| `in` | Execute in a specific worker | `(def w (spawn)) @(in w (+ 10 20))` |
+| `future` | Dispatch to thread pool (no startup cost) | `@(future (expensive-work))` |
+| `pmap` | Parallel map across collections | `(pmap inc (range 1000))` |
+| `pcalls` | Run functions in parallel | `(pcalls fn-a fn-b fn-c)` |
+| `pvalues` | Evaluate expressions in parallel | `(pvalues (expr-a) (expr-b))` |
+| `=>>` | Parallel transducer pipeline | `(=>> data (map f) (filter g) (apply +))` |
 
-There are lots of possibilities with build configurations around web workers and eventually there will be an entire wiki article here on just that topic. Please file an issue if you find improved workflows or have questions about how to get things working.
+Binding conveyance is automatic - local bindings and namespace vars are transmitted across worker boundaries transparently:
 
-#### Figwheel
-There currently isn't a figwheel build configuration example provided in this repo, but I've had prior versions of this library working on figwheel and I'm hoping to have examples here soon - I just haven't had time. Please submit a PR if you get a great build configuration similar to the one above for shadow.
-
-#### cljs.main
-As with figwheel, a solid set of directions for getting this working with the default `cljs.main` build tools is forthcoming - PRs welcome!
-
-### cljs-thread.core/init!
-Eventually, once all the different build tools have robust configurations, I would like to iron out a set of default configurations within `cljs-thread` such that things Just Work - just like spawning threads on the JVM. For now, you have to provide `cljs-thread` details on what your build configuration is _in code_ with `cljs-thread.core/init!` like so:
-```
-(thread/init!
- {:sw-connect-string "/sw.js"
-  :repl-connect-string "/repl.js"
-  :core-connect-string "/core.js"})
-```
-`:sw-connect-string` defines where your service worker artifact is found, relative to the base directory of your server. Same goes for `:repl-connect-string` and `:core-connect-string`. You can also provide a `:root-connect-string`, `:future-connect-string` and `:injest-connect-string` - if you don't, they will default to your `:core-connect-string`.
-
-## Demo
-https://johnmn3.github.io/cljs-thread/
-
-The `shadow-dashboard` example project contains a standard dashboard demo built on re-frame/mui-v5/comp.el/sync-IndexedDB, with application logic (reg-subs & reg-event functions) moved into a webworker, where only react rendering is handled on the screen thread, allowing for buttery-smooth components backed by large data transformations in the workers.
-
-<img width="1298" alt="Screen Shot 2022-07-30 at 5 46 23 PM" src="https://user-images.githubusercontent.com/127271/181997138-66025f77-7d87-45b1-9697-73d5c7d77e26.png">
-
-## `spawn`
-There are a few ways you can `spawn` a worker.
-
-_No args_:
 ```clojure
-(def s1 (spawn))
-```
-This will create a webworker and you'll be able to do something with it afterwards.
-
-_Only a body_:
-```clojure
-(spawn (println :addition (+ 1 2 3)))
-;:addition 6
-```
-This will create a webworker, run the code in it (presumably for side effects) and then terminate the worker. This is considered an _ephemeral worker_.
-
-_Named worker_:
-```clojure
-(def s2 (spawn {:id :s2} (println :hi :from thread/id)))
-;:hi :from :s2
-```
-This creates a webworker named `:s2` and you'll be able to do something with `s2` afterwards.
-
-_Ephemeral deref_:
-```clojure
-(println :ephemeral :result @(spawn (+ 1 2 3)))
-;:ephemeral :result 6
-```
-In workers, `spawn` returns a derefable, which returns the body's return value. In the main/screen thread, it returns a promise:
-```clojure
-(-> @(spawn (+ 1 2 3))
-    (.then #(println :ephemeral :result %)))
-;:ephemeral :result 6
-```
-> Note: The deref (`@(spawn...`) forces the result to be resolved for `.then`ing. Choosing not to deref on the main thread, as with on workers, implies the evaluation is side effecting and that we don't care about returning the result.
-
-In a worker, you can force the return of a promise with `(spawn {:promise? true} (+ 1 2 3))` if you'd rather treat it like a promise:
-```clojure
-(-> @(js/Promise.all #js [(spawn {:promise? true} 1) (spawn {:promise? true} 2)])
-    (.then #(println :res (js->clj %))))
-;:res [1 2]
-```
-`spawn` has more features, but they mostly match the features of `in` and `future` which we'll go over below. `spawn` has a startup cost that we don't want to have to pay all the time, so you should use it sparingly.
-## `in`
-Now that we have some workers, let's do some stuff `in` them:
-```clojure
-(in s1 (println :hi :from :s1))
-;:hi :from :s1
-```
-We can also make chains of execution across multiple workers:
-```clojure
-(in s1
-    (println :now :we're :in :s1)
-    (in s2
-        (println :now :we're :in :s2 :through :s1)))
-;:now :we're :in :s1
-;:now :we're :in :s2 :through :s1
-```
-You can also deref the return value of `in`:
-```clojure
-@(in s1 (+ 1 @(in s2 (+ 2 3))))
+(let [x 3
+      a (t/atom {:a 1})
+      c (spawn)]
+  @(in c (+ (:a @a) @(future (+ 2 x)))))
 ;=> 6
 ```
-### Binding conveyance
-For most functions, `cljs-thread` will try to automatically convey local bindings, as well as vars local to the invoking namespace, across workers:
-```clojure
-(let [x 3] 
-    @(in s1 (+ 1 @(in s2 (+ 2 x)))))
-;=> 6
-```
-That works for both symbols bound to the local scope of the form and to top level defs of the current namespace. So this will work:
-```clojure
-(def x 3)
-@(in s1 (+ 1 @(in s2 (+ 2 x))))
-```
-Some things however cannot be transmitted. This will not work:
-```clojure
-(def y (atom 3))
-@(in s1 (+ 1 @(in s2 (+ 2 @y))))
-```
-Atoms will not be serialized. That would break the identity semantics that atoms provide. If the current namespace is being shared between both sides of the invocation and you want to reference an atom that lives on the remote side without conveying the local one, you can either:
-- Define it in another namespace, so the local version is not conveyed (it's not a bad idea to define stateful things in a special namespace anyway); or
-- Declare the invocation with `:no-globals?` like `@(in s1 {:no-globals? true} (+ 1 @(in s2 (+ 2 @y))))`. This way, you can have `y` defined in the same namespace on both ends of the invocation but you'll be explicitly referencing the one on the remote side; or
-- Use an explicit conveyence vector that does not include the local symbol, like `@(in s1 [s2] (+ 1 @(in s2 (+ 2 @y))))`. Using explicit conveyance vectors disables implicit conveyance altogether.
 
-As mentioned above, you can also explicity define a _conveyance vector_:
-```clojure
-@(in s1 [x s2] (+ 1 @(in s2 (+ 2 x))))
-;=> 6
-```
-Here, `[x s2]` declares that we want to pass `x` (here defined as `3`) through to `s2`. We don't need to declare it again in `s2` because now it is implicitly conveyed as it is in the local scope of the form.
+See the full **[API Guide](doc/02-api-guide.md)** for comprehensive examples.
 
-We could also avoid passing `s2` by simpling referencing it by its `:id`:
-```clojure
-@(in s1 [x] (+ 1 @(in :s2 (+ 2 x))))
-;=> 6
-```
-However, you can't mix both implicit and explicit binding conveyance:
-```clojure
-(let [z 3]
-  @(in s1 [x] (+ 1 @(in :s2 (+ x z)))))
-;=> nil
-```
-Rather, this would work:
-```clojure
-(let [z 3]
-  @(in s1 [x y] (+ 1 @(in :s2 (+ x z)))))
-;=> 7
-```
-The explicit conveyance vector is essentially your escape hatch, for when the simple implicit conveyance isn't enough or is too much.
-### `yield`
+## Documentation
 
-When you want to convert an async javascript function into a synchronous one, `yield` is especially useful:
-```clojure
-(->> @(in s1 (-> (js/fetch "http://api.open-notify.org/iss-now.json")
-                 (.then #(.json %))
-                 (.then #(yield (js->clj % :keywordize-keys true)))))
-     :iss_position
-     (println "ISS Position:"))
-;ISS Position: {:latitude 44.4403, :longitude 177.0011}
-```
-> Note: binding conveyance and `yield` also work with `spawn`
-> ```clojure
-> (let [x 6]
->   @(spawn (yield (+ x 2)) (println :i'm :ephemeral)))
-> ;:i'm :ephemeral
-> ;=> 8
->```
-> You can also nest spawns
->```clojure
-> @(spawn (+ 1 @(spawn (+ 2 3))))
-> ;=> 6
->```
-> But that will take 10 to 100 times longer, due to worker startup delay, so make sure that your work is truly heavy and ephemeral. With re-frame, react and a few other megabytes of dev-time dependencies loaded in `/core.js`, that call took me about 1 second to complete - not very fast.
+### Basic — Get Up and Running
 
-> Also note: You can use `yield` to temporarily prevent the closing of an ephemeral `spawn` as well:
->```clojure
-> @(spawn (js/setTimeout
->          #(yield (println :finally!) (+ 1 2 3))
->          5000))
-> ;:finally!
-> ;=> 6
->```
-> Where `6` took 5 seconds to return - handy for async tasks in ephemeral workers.
-## `future`
-You don't have to create new workers though. `cljs-thread` comes with a thread pool of workers which you can invoke `future` on. Once invoked, it will grab one of the available workers, do the work on it and then free it when it's done.
-```clojure
-(let [x 2]
-  @(future (+ 1 @(future (+ x 3)))))
-;=> 6
-```
-That took about 20 milliseconds.
+| Guide | Description |
+|-------|-------------|
+| **[Getting Started](doc/01-getting-started.md)** | Installation, `init!`, first example |
+| **[API Guide](doc/02-api-guide.md)** | `spawn`, `in`, `future`, `pmap`, `pcalls`, `pvalues`, `=>>` |
+| [Binding Conveyance](doc/03-binding-conveyance.md) | Implicit/explicit conveyance, what doesn't convey |
+| [Yield & Async](doc/04-yield-and-async.md) | `yield`, screen-thread promises, async patterns |
+| **[Build Configuration](doc/05-build-configuration.md)** | Shadow-cljs, Figwheel, Node.js build patterns |
+| **[Deployment](doc/06-deployment.md)** | COOP/COEP headers, server configs, troubleshooting |
+| [Platform Support](doc/12-platform-support.md) | Browser matrix, Node.js, SAB vs SW fallback |
 
-> Note: A single synchronous `future` call will cost you around 8 to 10 milliseconds. A single synchronous `in` call will cost you around 4 to 5 milliseconds, depending on if it needs to be proxied.
+### Intermediate — Features and Data Structures
 
-Again, all of these constructs return promises on the main/screen thread:
-```clojure
-(-> @(future (-> (js/fetch "http://api.open-notify.org/iss-now.json")
-                 (.then #(.json %))
-                 (.then #(yield (js->clj % :keywordize-keys true)))))
-    (.then #(println "ISS Position:" (:iss_position %))))
-;ISS Position: {:latitude 45.3612, :longitude -110.6497}
-```
-You wouldn't want to do this for such a lite-weight api call, but if you have some large payloads that you need fetched and normalized, it can be convenient to run them in futures for handling off the main thread.
+| Guide | Description |
+|-------|-------------|
+| [DOM Proxy](doc/14-dom-proxy.md) | Transparent DOM access from workers — events, rAF, observers, batching |
+| [Eve Data Structures](doc/08-eve-data-structures.md) | SharedArrayBuffer atoms, hash maps, hash sets, typed arrays, `deftype` |
+| [eve/obj — Typed Shared Objects](doc/15-eve-obj.md) | Schema-based AoS and SoA objects with full Atomics API |
+| [Specialized EVE Collections](doc/18-eve-collections.md) | Integer maps, red-black trees, vectors, lists |
+| [Worker Environment](doc/21-worker-environment.md) | Thread identity, environment predicates, worker topology |
+| [Advanced Threading](doc/22-advanced-threading.md) | `yield`, go-blocks, `:promise?`, daemon workers |
+| [Async Utilities](doc/16-async-utilities.md) | `on-when`, `on-watch`, `sleep` — bootstrapping helpers |
+| [Persistence](doc/20-persistence.md) | `db-set!` / `db-get` — IndexedDB from any worker |
+| [Persistent Atoms](doc/24-persistent-atoms.md) | Cross-process mmap-backed atoms — JVM + Node.js |
+| [Configuration Reference](doc/17-configuration-reference.md) | All `init!` options, spawn/in/future options, compiler flags |
+| [Serialization](doc/19-serialization.md) | Wire protocol — what transfers, what doesn't, debugging tips |
 
-`cljs-thread`'s blocking semantics are great for achieving synchronous control flow when you need it, but as shown above, it has a performance cost of having to wait on the service worker to proxy results. Therefore, you wouldn't want to use them in very hot loops or for implementing tight algorithms. We can beat single threaded performance though if we're smart about chunking work up into large pieces and fanning it across a pool of workers. You can design your own system for doing that, but `cljs-thread` comes with a solution for pure functions: `=>>`. It also comes with a version of `pmap`. (see the official [`clojure.core/pmap`](https://clojuredocs.org/clojure.core/pmap) for more info)
+### Advanced — Architecture and Internals
 
-## `pmap`
-`pmap` lazily consumes one or more collections and maps a function across them in parallel.
-```clojure
-(def z inc)
-(let [i +]
-  (->> [1 2 3 4]
-       (pmap (fn [x y] (pr :x x :y y) (z (i x y))) [9 8 7 6])
-       (take 2)))
-;:x 9 :y 1
-;:x 8 :y 2
-;=> (11 11)
-```
-Taking an example from clojuredocs.org:
-```clojure
-;; A function that simulates a long-running process by calling thread/sleep:
-(defn long-running-job [n]
-    (thread/sleep 1000) ; wait for 1 second
-    (+ n 10))
+| Guide | Description |
+|-------|-------------|
+| [Architecture](doc/07-architecture.md) | Fat kernel, sync layer, worker mesh, catch-and-load |
+| [Stepping Debugger](doc/09-stepping-debugger.md) | `dbg`, `break`, `in?` |
+| [Testing](doc/10-testing.md) | Test runner, tier system, reporters, X-RAY diagnostics |
+| [Internals Deep Dive](doc/23-internals.md) | WASM memory, slab allocator, CPS transform, Service Worker protocol |
+| [Agent & Contributor Guide](doc/11-agent-guide.md) | Architecture invariants, gotchas, onboarding |
+| [History & Design Notes](doc/13-history.md) | `tau.alpha` lineage, fat kernel evolution |
 
-;; Use `doall` to eagerly evaluate `map`, which evaluates lazily by default.
+## Platform Support
 
-;; With `map`, the total elapsed time is just over 4 seconds:
-user=> (time (doall (map long-running-job (range 4))))
-"Elapsed time: 4012.500000 msecs"
-(10 11 12 13)
+| Platform | Sync Mechanism | Notes |
+|----------|---------------|-------|
+| Chrome/Edge | SharedArrayBuffer + Atomics | Full support with COOP/COEP headers |
+| Firefox | SharedArrayBuffer + Atomics | Full support with COOP/COEP headers |
+| Safari 15.2+ | SharedArrayBuffer + Atomics | Not yet tested; requires `require-corp` COEP (not `credentialless`) |
+| Node.js | SharedArrayBuffer + Atomics | Full support, no headers needed |
 
-;; With `pmap`, the total elapsed time is just over 1 second:
-user=> (time (doall (pmap long-running-job (range 4))))
-"Elapsed time: 1021.500000 msecs"
-(10 11 12 13)
-```
-## `=>>`
-[`injest`](https://github.com/johnmn3/injest) is a library that makes it easier to work with transducers. It provides a `x>>` macro for Clojure and Clojurescript that converts thread-last macros (`->>`) into transducer chains. For Clojure, it provides a `=>>` variant that also parallelizes the transducers across a fork-join pool with `r/fold`. However, because we've been lacking blocking semantics in the browser, it was unable to provide the same macro to Clojurescript.
+## License
 
-`cljs-thread` provides the auto-transducifying, auto-parallelizing `=>>` macro that `injest` was missing.
-
-So, suppose you have some non-trivial work:
-```clojure
-(defn flip [n]
-  (apply comp (take n (cycle [inc dec]))))
-```
-On a single thread, in Chrome, this takes between 16 and 20 seconds (on this computer):
-```clojure
-(->> (range)
-     (map (flip 100))
-     (map (flip 100))
-     (map (flip 100))
-     (take 1000000)
-     (apply +)
-     time)
-```
-On Safari and Firefox, that will take between 60 and 70 seconds.
-
-Let's try it with `=>>`:
-```clojure
-(=>> (range)
-     (map (flip 100))
-     (map (flip 100))
-     (map (flip 100))
-     (take 1000000)
-     (apply +)
-     time)
-```
-On Chrome, that'll take only about 8 to 10 seconds. On Safari it takes about 30 seconds and in Firefox it takes around 20 seconds.
-
-So in Chrome and Safari, you can roughly double your speed and in Firefox you can go three or more times faster.
-
-By changing only one character, we can double or triple our performance, all while leaving the main thread free to render at 60 frames per second. Notice also how it's lazy :)
-
-> Note: On the main/screen thread, `=>>` returns a promise. `=>>` defaults to a chunk size of 512.
-
-## Stepping debugger
-
-The blocking semantics that `cljs-thread` provides open up the doors to a lot of things that weren't possible in Clojurescript/Javascript and the browser in general. One of these things is a stepping debugger in the runtime (outside of the JS console debugger). `cljs-thread` ships with a simple example of a stepping debugger:
-```clojure
-(dbg
- (let [x 1 y 3 z 5]
-   (println :starting)
-   (dotimes [i z]
-     (break (= i y))
-     (println :i i))
-   (println :done)
-   x))
-;:starting
-;:i 0
-;:i 1
-;:i 2
-;=> :starting-dbg
-```
-`dbg` is a convenience macro for sending a form to a debug worker that is constantly listening for new forms to evaluate for the purpose of debugging. `break` stops the execution from running beyond a particular location in the code. It also takes an optional form that defines _when_ the `break` should stop the execution. Upon entering the break, the debugger enters a sub-loop, waiting for forms which can inspect the local variables of the form in the context of the `break`.
-
-The `in?` macro allows you to send forms to the `break` context within the debugger:
-```clojure
-(in? z)
-;=> 5
-(in? i)
-;=> 3
-(in? [i x y z])
-;=> [3 1 3 5]
-(in? [z y x])
-;=> [5 3 1]
-(in? a)
-;=> nil
-```
-For forms that have symbols that are not locally bound variables in the remote form, you must declare an explicit conveyance vector containing the variables that should be referenced:
-```clojure
-(in? [x i] (+ x i))
-;=> 4
-```
-The `in?` macro above cannot know ahead of time that the form in the `dbg` instance hasn't locally re-bound the `+` symbol. Therefore, for non-simple forms, the conveyance vector is necessary to disambiguate which symbols require resolving in the local context of the remote form and which don't.
-
-By evaluating `:in/exit`, the running break context exits and the execution procedes to either the next break or until completion.
-```clojure
-(in? :in/exit)
-;:i 3
-;:i 4
-;:done
-;=> 1
-```
-
-This is just a rudimentary implementation of a stepping debugger. I've added keybindings for usage in Calva.
-
-It would be nice to implement a sub-repl that wrapped repl evaluations in the `in?` macro until exit. It would also be nice to implement an nrepl middle where for the same thing, transparently filling in the missing bits for cider's debugging middleware, such that editors like emacs and calva can automatically use their debugging workflows in a Clojurescript context. There's [a github issue for this feature](https://github.com/clojure-emacs/cider/issues/1416) in the cider repo and it would be nice to finally be able to unlock this capability for browser development. PRs welcome!
-
-> Note: There are a host of other use cases that weren't previously possible that become possible with blocking semantics. Another example might be porting Datascript to IndexedDB using a synchronous set/get interface. If there are any other possibilities that come to mind - things you've always wanted to be able to do but weren't able to due to the lack of blocking semantics in the browser - feel free to drop a request in the issues and we can explore it.
-
-## Some history
-
-`cljs-thread` is derived from [`tau.alpha`](https://github.com/johnmn3/tau.alpha) which I released about four years ago. That project evolved towards working with SharedArrayBuffers (SABs). A slightly update version of `tau.alpha` is available here: https://gitlab.com/johnmn3/tau and you can see a demo of the benefits of SABs here: https://simultaneous.netlify.app/
-
-At an early point during the development of `tau.alpha` about four years ago, I got blocking semantics to work with these synchronous XHRs and hacking the response from a sharedworker. I eventually abandoned this strategy when I discovered you could get blocking semantics and better performance out of SABs and `js/Atomics`.
-
-Unfortunately there was lot's of drama around the security of SABs and, years later, they require very constraining security settings, making their usage impractical for some deployment situations. Compared to using typed arrays in `tau.alpha`, you'll never get that same performance in `cljs-thread`, in terms of worker-to-worker communication - in `tau.alpha` you're literally using shared memory - but there's no reason these other features shouldn't be available in non-SAB scenarios, so I figured it would make sense to extract these other bits out into `cljs-thread` and build V2 of `tau.alpha` on top of it. With `tau.beta`, built on `cljs-thread`, I'll be implementing SAB-less variants of `atom`s and `agent`s, with similar semantics to that of Clojure's. Then I'll be implementing SAB-based versions that folks can opt in to if desired.
+Copyright 2022-2026 John Newman. Distributed under the MIT License.

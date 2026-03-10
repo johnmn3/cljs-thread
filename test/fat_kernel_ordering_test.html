@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<!--
+  Script-ordering robustness test for fat-kernel URL-forward (Strategy 1).
+
+  Purpose: verify that fat-kernel correctly detects the kernel URL even when
+  non-kernel scripts appear BEFORE the kernel scripts in the HTML.
+
+  This simulates the real-world failure mode that motivated Strategy 1:
+  a library script (like canvas-confetti) served from a different directory
+  was the first <script src> on the page, poisoning the old detect-base-url-
+  from-scripts (which took scripts[0].src). The probe-based approach in
+  Strategy 1 tries all script base URLs and finds the one with manifest.edn.
+
+  The decoy script is served via a query-string path trick: /decoy.js?v=1
+  — the server returns a 404, which causes the probe to skip that base URL
+  and try the next one (shared.js), which succeeds.
+
+  Test invariant: ALL fat-kernel tests must pass despite the decoy script
+  appearing first. The kernel-url must still be an http:// URL pointing to
+  the correct build output directory.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>cljs-thread Fat Kernel — Ordering Robustness Test</title>
+  <style>
+    body { background: #0d1117; color: #c9d1d9; font-family: monospace; padding: 1em; }
+    #status { font-size: 1.4em; padding: 0.5em; margin: 1em 0; }
+    #status.running { background: #1a1a2e; color: #58a6ff; }
+    #status.pass { background: #0d3b1e; color: #3fb950; }
+    #status.fail { background: #3b1012; color: #f85149; }
+    #log { max-height: 60vh; overflow-y: auto; }
+    pre { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Fat Kernel — Script Ordering Robustness Test</h1>
+  <p>A decoy script (404) appears <strong>before</strong> the kernel scripts.
+     Strategy 1 probe-based detection must still find the kernel correctly.</p>
+  <div id="status" class="running">Initializing...</div>
+  <div id="results"></div>
+  <pre id="log"></pre>
+  <!--
+    DECOY: a non-kernel script loaded FIRST.
+    This 404s — the probe-based detect-kernel-url-browser! must skip it
+    and find manifest.edn from the next script's base URL instead.
+  -->
+  <script src="/nonexistent-decoy-script.js"></script>
+  <!-- Kernel scripts (same directory, has manifest.edn) -->
+  <script src="shared.js"></script>
+  <script src="screen.js"></script>
+</body>
+</html>
