@@ -1,8 +1,8 @@
 {:paths ["src" "ex" "ex/reagami_counter/src" "ex/raytracer/src"]
  :deps {org.clojure/clojure       {:mvn/version "1.12.0"}
         net.clojars.john/injest   {:mvn/version "0.1.0-beta.8"}
-        eve/eve                   {:git/url "https://github.com/SeniorCareMarket-com/eve"
-                                   :git/sha "237a6ebabd3823bdce0ce759b2be156370db9994"}}
+        eve/eve                   {:git/url "https://github.com/SeniorCareMarket/eve"
+                                   :git/sha "0e084fffeb0d9f2a8754c812be60bc22d2991a75"}}
  :aliases
  {:node-test
   {:extra-paths ["test" "target/generated-test"]
@@ -31,5 +31,5 @@
                  {:git/tag "v0.3.1" :git/sha "996ddfa"}}
           :ns-default build}
   ;; Eve-specific aliases (native-build-atom, native-x-stress-atom)
-  ;; are in the eve repo: https://github.com/SeniorCareMarket-com/eve
+  ;; are in the eve repo: https://github.com/SeniorCareMarket/eve
   }}
